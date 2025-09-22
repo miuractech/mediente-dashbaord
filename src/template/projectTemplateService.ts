@@ -775,7 +775,7 @@ export const stepTaskService = {
   },
 
   // Get available parent tasks for a step (excluding the task itself and its descendants)
-  async getAvailableParentTasks(stepId: string, excludeTaskId?: string): Promise<StepTask[]> {
+  async getAvailableParentTasks(stepId: string, excludeTaskId?: string, limit: number = 10): Promise<StepTask[]> {
     let query = supabase
       .from('step_tasks')
       .select('*')
@@ -786,7 +786,9 @@ export const stepTaskService = {
       query = query.neq('task_id', excludeTaskId);
     }
 
-    const { data, error } = await query.order('task_order');
+    const { data, error } = await query
+      .order('task_order', { ascending: true })
+      .limit(limit);
 
     if (error) throw error;
 
@@ -806,7 +808,7 @@ export const stepTaskService = {
     currentStepId: string, 
     searchTerm: string = '',
     excludeTaskId?: string,
-    limit: number = 50
+    limit: number = 10
   ): Promise<(StepTask & { step_name: string; phase_name: string; phase_order: number; step_order: number })[]> {
     
     // First, get the current step's phase and step order to determine what's "previous"
@@ -851,8 +853,9 @@ export const stepTaskService = {
       .eq('phase_steps.template_phases.template_id', templateId)
       .eq('is_archived', false);
 
-    // Add search filter if provided
+    // Add search filter if provided (optimized for millions of tasks)
     if (searchTerm.trim()) {
+      // Use case-insensitive search with ILIKE - database should have GIN index on task_name and description
       query = query.or(`task_name.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
     }
 
@@ -862,13 +865,13 @@ export const stepTaskService = {
     }
 
     const { data, error } = await query
-      .order('task_order')
+      .order('task_order', { ascending: true })
       .limit(limit);
 
     if (error) throw error;
     if (!data) return [];
 
-    // Filter to only include tasks from previous phases or previous steps in current phase
+    // Filter to include tasks from current and previous phases, but exclude future phases/steps
     const filteredTasks = data.filter(task => {
       // Type assertion for Supabase nested relations
       const phaseSteps = task.phase_steps as unknown as { 
@@ -888,7 +891,13 @@ export const stepTaskService = {
         return true;
       }
       
-      // Exclude all other cases (same step, future steps, future phases)
+      // Include if from same phase and same step (current step)
+      // Note: Specific task exclusion (excludeTaskId) is already handled in the query
+      if (taskPhaseOrder === currentPhaseOrder && taskStepOrder === currentStepOrder) {
+        return true;
+      }
+      
+      // Exclude future steps and future phases
       return false;
     });
 
@@ -964,6 +973,136 @@ export const stepTaskService = {
 
     if (error) throw error;
     return data || [];
+  },
+
+  // Get all tasks from a phase (from all steps within that phase)
+  async getByPhaseId(phaseId: string): Promise<(StepTask & { step_name: string; step_order: number })[]> {
+    const { data, error } = await supabase
+      .from('step_tasks')
+      .select(`
+        *,
+        phase_steps!inner(
+          step_name,
+          step_order,
+          phase_id
+        )
+      `)
+      .eq('phase_steps.phase_id', phaseId)
+      .eq('is_archived', false)
+      .order('phase_steps(step_order)', { ascending: true })
+      .order('task_order', { ascending: true });
+
+    if (error) throw error;
+
+    return (data || []).map(task => ({
+      ...task,
+      step_name: (task.phase_steps as unknown as { step_name: string; step_order: number }).step_name || '',
+      step_order: (task.phase_steps as unknown as { step_name: string; step_order: number }).step_order || 0
+    }));
+  },
+
+  // Get available parent tasks from current phase and previous phases for phase-level task creation
+  async getAvailableParentTasksFromTemplateForPhase(
+    templateId: string, 
+    currentPhaseId: string,
+    excludeTaskId?: string,
+    limit: number = 10,
+    searchTerm?: string
+  ): Promise<(StepTask & { step_name: string; phase_name: string; phase_order: number; step_order: number })[]> {
+    
+    // First, get the current phase order to filter previous and current phases
+    const { data: currentPhase } = await supabase
+      .from('template_phases')
+      .select('phase_order')
+      .eq('phase_id', currentPhaseId)
+      .single();
+
+    if (!currentPhase) {
+      throw new Error('Current phase not found');
+    }
+
+    let query = supabase
+      .from('step_tasks')
+      .select(`
+        *,
+        phase_steps!inner(
+          step_name,
+          step_order,
+          phase_id,
+          template_phases!inner(
+            phase_name,
+            phase_order,
+            template_id
+          )
+        )
+      `)
+      .eq('phase_steps.template_phases.template_id', templateId)
+      .eq('is_archived', false)
+      // Include tasks from current phase and all previous phases
+      .lte('phase_steps.template_phases.phase_order', currentPhase.phase_order);
+
+    // Exclude current task if editing
+    if (excludeTaskId) {
+      query = query.neq('task_id', excludeTaskId);
+    }
+
+    // Add search filter if provided (optimized for millions of tasks)
+    if (searchTerm && searchTerm.trim()) {
+      // Use case-insensitive search with ILIKE - database should have GIN index on task_name and description
+      query = query.or(`task_name.ilike.%${searchTerm.trim()}%,description.ilike.%${searchTerm.trim()}%`);
+    }
+
+    const { data, error } = await query
+      .order('task_order', { ascending: true })
+      .limit(limit);
+
+    if (error) throw error;
+    if (!data) return [];
+
+    // Format the data
+    const formattedTasks = data.map(task => {
+      const phaseSteps = task.phase_steps as unknown as { 
+        step_name: string;
+        step_order: number; 
+        template_phases: { phase_name: string; phase_order: number }[] 
+      }[];
+      
+      return {
+        ...task,
+        step_name: phaseSteps[0]?.step_name || '',
+        phase_name: phaseSteps[0]?.template_phases[0]?.phase_name || '',
+        phase_order: phaseSteps[0]?.template_phases[0]?.phase_order || 0,
+        step_order: phaseSteps[0]?.step_order || 0
+      };
+    });
+
+    // Sort the formatted tasks by phase order, step order, and task order
+    formattedTasks.sort((a, b) => {
+      // First sort by phase order
+      if (a.phase_order !== b.phase_order) {
+        return a.phase_order - b.phase_order;
+      }
+      // Then by step order
+      if (a.step_order !== b.step_order) {
+        return a.step_order - b.step_order;
+      }
+      // Finally by task order
+      return a.task_order - b.task_order;
+    });
+
+    // Filter out descendants of excluded task if specified
+    if (excludeTaskId && formattedTasks.length > 0) {
+      try {
+        const descendants = await this.getTaskDescendants(excludeTaskId);
+        const descendantIds = descendants.map(d => d.task_id);
+        return formattedTasks.filter(task => !descendantIds.includes(task.task_id));
+      } catch (error) {
+        console.warn('Could not filter descendants:', error);
+        return formattedTasks;
+      }
+    }
+
+    return formattedTasks;
   },
 
   // Get tasks organized by hierarchy (root tasks with their children)
@@ -1354,5 +1493,23 @@ export const stepCopyService = {
       }
       return a.step_order - b.step_order;
     });
+  }
+};
+
+// Phase Steps Service with enhanced methods for new UI
+export const phaseStepServiceEnhanced = {
+  ...phaseStepService,
+
+  // Get steps by phase ID for selection in task creation
+  async getByPhaseIdForSelection(phaseId: string): Promise<PhaseStep[]> {
+    const { data, error } = await supabase
+      .from('phase_steps')
+      .select('*')
+      .eq('phase_id', phaseId)
+      .eq('is_archived', false)
+      .order('step_order');
+
+    if (error) throw error;
+    return data || [];
   }
 };

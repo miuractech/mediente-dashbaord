@@ -41,6 +41,7 @@ import {
   projectTemplateService, 
   templatePhaseService, 
   phaseStepService, 
+  phaseStepServiceEnhanced,
   stepTaskService,
   templateRoleUsageService
 } from '../template/projectTemplateService';
@@ -53,7 +54,7 @@ import GenericConfirmationDialog from '../components/GenericConfirmationDialog';
 import DuplicateTemplateModal from '../template/DuplicateTemplateModal';
 import { CopyTasksModal } from '../template/CopyTasksModal';
 import { CopyStepModal } from '../template/CopyStepModal';
-import { DraggablePhasesList, DraggableStepsList, DraggableTasksList } from '../template/DraggableTemplateList';
+import { DraggablePhasesList, DraggableTasksList, DraggablePhaseTasksList } from '../template/DraggableTemplateList';
 
 interface PathSegment {
   type: 'template' | 'phase' | 'step';
@@ -75,8 +76,9 @@ export default function TemplatesPage() {
   // Data states
   const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
   const [phases, setPhases] = useState<TemplatePhase[]>([]);
-  const [steps, setSteps] = useState<PhaseStep[]>([]);
   const [tasks, setTasks] = useState<StepTask[]>([]);
+  const [phaseTasks, setPhaseTasks] = useState<(StepTask & { step_name: string; step_order: number })[]>([]);
+  const [phaseSteps, setPhaseSteps] = useState<PhaseStep[]>([]);
   const [roles, setRoles] = useState<TemplateRole[]>([]);
   const [templateRoles, setTemplateRoles] = useState<TemplateRoleUsage[]>([]);
   
@@ -90,12 +92,12 @@ export default function TemplatesPage() {
   // Modal states
   const [templateModalOpened, { open: openTemplateModal, close: closeTemplateModal }] = useDisclosure(false);
   const [phaseModalOpened, { open: openPhaseModal, close: closePhaseModal }] = useDisclosure(false);
-  const [stepModalOpened, { open: openStepModal, close: closeStepModal }] = useDisclosure(false);
+  const [stepModalOpened, { close: closeStepModal }] = useDisclosure(false);
   const [taskModalOpened, { open: openTaskModal, close: closeTaskModal }] = useDisclosure(false);
   const [deleteModalOpened, { open: openDeleteModal, close: closeDeleteModal }] = useDisclosure(false);
   const [duplicateModalOpened, { open: openDuplicateModal, close: closeDuplicateModal }] = useDisclosure(false);
   const [copyTasksModalOpened, { open: openCopyTasksModal, close: closeCopyTasksModal }] = useDisclosure(false);
-  const [copyStepModalOpened, { open: openCopyStepModal, close: closeCopyStepModal }] = useDisclosure(false);
+  const [copyStepModalOpened, { close: closeCopyStepModal }] = useDisclosure(false);
   
   // Edit states
   const [editingTemplate, setEditingTemplate] = useState<ProjectTemplate | undefined>();
@@ -188,10 +190,14 @@ export default function TemplatesPage() {
         setTemplateRoles(templateRolesData);
         setRolesPage(1); // Reset pagination when switching templates
       } else if (path.length === 2) {
-        // Steps view
+        // Phase tasks view - show all tasks from all steps in this phase
         const phaseId = path[1].id;
-        const stepsData = await phaseStepService.getByPhaseId(phaseId);
-        setSteps(stepsData);
+        const [phaseTasksData, phaseStepsData] = await Promise.all([
+          stepTaskService.getByPhaseId(phaseId),
+          phaseStepServiceEnhanced.getByPhaseIdForSelection(phaseId)
+        ]);
+        setPhaseTasks(phaseTasksData);
+        setPhaseSteps(phaseStepsData);
       } else if (path.length === 3) {
         // Tasks view
         const stepId = path[2].id;
@@ -220,20 +226,14 @@ export default function TemplatesPage() {
     navigate(`/admin/templates/${template.template_id}`);
   };
 
-  const navigateToSteps = (phase: TemplatePhase) => {
+  const navigateToTasks = (phase: TemplatePhase) => {
     if (path.length === 1) {
       const templateId = path[0].id;
       navigate(`/admin/templates/${templateId}/${phase.phase_id}`);
     }
   };
 
-  const navigateToTasks = (step: PhaseStep) => {
-    if (path.length === 2) {
-      const templateId = path[0].id;
-      const phaseId = path[1].id;
-      navigate(`/admin/templates/${templateId}/${phaseId}/${step.step_id}`);
-    }
-  };
+  // Remove the step-level navigation since we're eliminating that level
 
   const navigateToBreadcrumb = (index: number) => {
     if (index === -1) {
@@ -263,11 +263,11 @@ export default function TemplatesPage() {
       setEditingPhase(item as TemplatePhase);
       openPhaseModal();
     } else if (path.length === 2) {
-      // Steps view
-      setEditingStep(item as PhaseStep);
-      openStepModal();
+      // Phase tasks view - editing tasks
+      setEditingTask(item as StepTask);
+      openTaskModal();
     } else if (path.length === 3) {
-      // Tasks view
+      // Legacy: Tasks view (keeping for backward compatibility)
       setEditingTask(item as StepTask);
       openTaskModal();
     }
@@ -288,12 +288,12 @@ export default function TemplatesPage() {
       id = item.phase_id;
       name = item.phase_name;
     } else if (path.length === 2) {
-      // Steps view
-      type = 'steps';
-      id = item.step_id;
-      name = item.step_name;
+      // Phase tasks view
+      type = 'tasks';
+      id = item.task_id;
+      name = item.task_name;
     } else if (path.length === 3) {
-      // Tasks view
+      // Legacy: Tasks view (keeping for backward compatibility)
       type = 'tasks';
       id = item.task_id;
       name = item.task_name;
@@ -305,14 +305,19 @@ export default function TemplatesPage() {
     openDeleteModal();
   };
 
-  // Copy handlers
-  const handleCopyStep = (step: PhaseStep) => {
-    setStepToCopy(step);
-    openCopyStepModal();
-  };
+  // Copy handlers for legacy support
 
   const handleCopyTasks = () => {
-    if (path.length === 3) {
+    if (path.length === 2 && phaseTasks.length > 0) {
+      // For phase-level copying, we'll copy from the first step that has tasks
+      const firstTaskStep = phaseTasks[0];
+      setTasksToCopy({ 
+        stepId: firstTaskStep.step_id, 
+        stepName: firstTaskStep.step_name 
+      });
+      openCopyTasksModal();
+    } else if (path.length === 3) {
+      // Legacy step-level copying
       const currentStep = path[2];
       setTasksToCopy({ 
         stepId: currentStep.id, 
@@ -407,43 +412,7 @@ export default function TemplatesPage() {
     }
   };
 
-  const handleReorderSteps = async (reorderedSteps: PhaseStep[]) => {
-    if (path.length !== 2) return;
-    
-    const phaseId = path[1].id;
-    const originalSteps = [...steps]; // Store original order for rollback
-    
-    // Immediate UI update (optimistic)
-    setSteps(reorderedSteps);
-    
-    try {
-      const stepOrders = reorderedSteps.map(step => ({
-        step_id: step.step_id,
-        step_order: step.step_order
-      }));
-
-      await phaseStepService.reorder(phaseId, stepOrders);
-      
-      // Success notification (optional, can be removed for less noise)
-      notifications.show({
-        title: 'Success',
-        message: 'Steps reordered successfully',
-        color: 'green',
-        autoClose: 2000
-      });
-    } catch (error) {
-      console.error('Error reordering steps:', error);
-      
-      // Rollback to original order on error
-      setSteps(originalSteps);
-      
-      notifications.show({
-        title: 'Error',
-        message: 'Failed to reorder steps. Order has been restored.',
-        color: 'red'
-      });
-    }
-  };
+  // Legacy step reorder function - removed since we no longer show step view
 
   const handleReorderTasks = async (reorderedTasks: StepTask[]) => {
     if (path.length !== 3) return;
@@ -474,6 +443,59 @@ export default function TemplatesPage() {
       
       // Rollback to original order on error
       setTasks(originalTasks);
+      
+      notifications.show({
+        title: 'Error',
+        message: 'Failed to reorder tasks. Order has been restored.',
+        color: 'red'
+      });
+    }
+  };
+
+  const handleReorderPhaseTasks = async (reorderedTasks: (StepTask & { step_name: string; step_order: number })[]) => {
+    if (path.length !== 2) return;
+    
+    // Group tasks by step for reordering
+    const tasksByStep = new Map<string, StepTask[]>();
+    reorderedTasks.forEach((task) => {
+      if (!tasksByStep.has(task.step_id)) {
+        tasksByStep.set(task.step_id, []);
+      }
+      tasksByStep.get(task.step_id)!.push({
+        ...task,
+        task_order: tasksByStep.get(task.step_id)!.length + 1
+      });
+    });
+    
+    const originalTasks = [...phaseTasks]; // Store original order for rollback
+    
+    // Immediate UI update (optimistic)
+    setPhaseTasks(reorderedTasks.map((task, idx) => ({
+      ...task,
+      task_order: idx + 1
+    })));
+    
+    try {
+      // Reorder tasks within each step
+      for (const [stepId, stepTasks] of tasksByStep) {
+        const taskOrders = stepTasks.map((task, idx) => ({
+          task_id: task.task_id,
+          task_order: idx + 1
+        }));
+        await stepTaskService.reorder(stepId, taskOrders);
+      }
+      
+      notifications.show({
+        title: 'Success',
+        message: 'Tasks reordered successfully',
+        color: 'green',
+        autoClose: 2000
+      });
+    } catch (error) {
+      console.error('Error reordering phase tasks:', error);
+      
+      // Rollback to original order on error
+      setPhaseTasks(originalTasks);
       
       notifications.show({
         title: 'Error',
@@ -517,10 +539,10 @@ export default function TemplatesPage() {
       // Phases view - need template ID
       return path[0].id;
     } else if (path.length === 2) {
-      // Steps view - need phase ID
+      // Phase tasks view - need phase ID
       return path[1].id;
     } else if (path.length === 3) {
-      // Tasks view - need step ID
+      // Legacy: Tasks view - need step ID
       return path[2].id;
     }
     return '';
@@ -690,7 +712,7 @@ export default function TemplatesPage() {
                   onReorder={handleReorderPhases}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
-                  onView={(phase) => navigateToSteps(phase)}
+                  onView={(phase) => navigateToTasks(phase)}
                 />
               )}
             </Stack>
@@ -756,13 +778,13 @@ export default function TemplatesPage() {
     );
   };
 
-  const renderSteps = () => (
+  const renderPhaseTasks = () => (
     <Card>
       <Stack>
         <Group justify="space-between">
-          <Title order={2}>Steps</Title>
-          <Button leftSection={<IconPlus size={16} />} onClick={openStepModal}>
-            Create Step
+          <Title order={2}>Phase Tasks</Title>
+          <Button leftSection={<IconPlus size={16} />} onClick={openTaskModal}>
+            Create Task
           </Button>
         </Group>
         
@@ -770,18 +792,20 @@ export default function TemplatesPage() {
           <Center p="xl">
             <Loader />
           </Center>
-        ) : steps.length === 0 ? (
+        ) : phaseTasks.length === 0 ? (
           <Center p="xl">
-            <Text c="dimmed">No steps found</Text>
+            <Text c="dimmed">No tasks found in this phase</Text>
           </Center>
         ) : (
-          <DraggableStepsList
-            steps={steps}
-            onReorder={handleReorderSteps}
+          <DraggablePhaseTasksList
+            tasks={phaseTasks}
+            onReorder={handleReorderPhaseTasks}
             onEdit={handleEdit}
             onDelete={handleDelete}
-            onView={(step) => navigateToTasks(step)}
-            onCopy={handleCopyStep}
+            onCreateChild={handleCreateChildTask}
+            onCopyTasks={handleCopyTasks}
+            getRoleName={getRoleName}
+            templateId={path.length > 0 ? path[0].id : ''}
           />
         )}
       </Stack>
@@ -829,7 +853,7 @@ export default function TemplatesPage() {
         
         {path.length === 0 && renderTemplates()}
         {path.length === 1 && renderPhases()}
-        {path.length === 2 && renderSteps()}
+        {path.length === 2 && renderPhaseTasks()}
         {path.length === 3 && renderTasks()}
 
         {/* Modals */}
@@ -859,10 +883,31 @@ export default function TemplatesPage() {
         <TaskFormModal
           opened={taskModalOpened}
           onClose={handleModalClose}
-          stepId={getCurrentParentId()}
+          stepId={path.length === 3 ? getCurrentParentId() : ''} // Only provide stepId for legacy step-level view
+          phaseId={path.length === 2 ? getCurrentParentId() : ''} // Provide phaseId for phase-level task creation
           templateId={path.length > 0 ? path[0].id : ''}
           task={editingTask}
           parentTaskId={parentTaskId}
+          phaseSteps={phaseSteps} // Available steps for selection
+          onSuccess={loadData}
+          />
+
+        <CopyTasksModal
+          opened={copyTasksModalOpened}
+          onClose={handleModalClose}
+          sourceStepId={tasksToCopy?.stepId || ''}
+          sourceStepName={tasksToCopy?.stepName || ''}
+          templateId={path.length > 0 ? path[0].id : ''}
+          onSuccess={loadData}
+        />
+
+        <CopyStepModal
+          opened={copyStepModalOpened}
+          onClose={handleModalClose}
+          sourceStepId={stepToCopy?.step_id || ''}
+          sourceStepName={stepToCopy?.step_name || ''}
+          templateId={path.length > 0 ? path[0].id : ''}
+          currentPhaseId={path.length > 1 ? path[1].id : ''}
           onSuccess={loadData}
         />
 
