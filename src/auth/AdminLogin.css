@@ -1,0 +1,11 @@
+.loginPaper {
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+  border: 1px solid transparent;
+}
+
+.loginPaper:hover {
+  border-color: #2196f3;
+  box-shadow: 0 0 0 1px #2196f3 inset;
+}
+
+

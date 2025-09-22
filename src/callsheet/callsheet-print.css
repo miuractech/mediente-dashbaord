@@ -1,0 +1,65 @@
+/* Print-specific styles for call sheets */
+@media print {
+  /* Hide elements that shouldn't be printed */
+  .no-print {
+    display: none !important;
+  }
+  
+  /* Ensure colors are preserved */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+  
+  /* Page settings */
+  @page {
+    size: A4;
+    margin: 0.5in;
+  }
+  
+  /* Mobile print adjustments */
+  .print-mobile {
+    font-size: 11px !important;
+    line-height: 1.3 !important;
+  }
+  
+  .print-mobile h1, .print-mobile h2 {
+    font-size: 16px !important;
+    margin: 8px 0 !important;
+  }
+  
+  .print-mobile h3, .print-mobile h4 {
+    font-size: 14px !important;
+    margin: 6px 0 !important;
+  }
+  
+  /* Ensure proper spacing for print */
+  .print-mobile .mantine-Card-root {
+    margin-bottom: 8px !important;
+    page-break-inside: avoid;
+  }
+  
+  /* Remove shadows and borders for cleaner print */
+  .print-mobile .mantine-Paper-root,
+  .print-mobile .mantine-Card-root {
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+  }
+  
+  /* Adjust spacing for desktop print */
+  .mantine-Paper-root {
+    box-shadow: none !important;
+  }
+  
+  /* Prevent page breaks inside important sections */
+  .mantine-Card-root {
+    page-break-inside: avoid;
+  }
+  
+  /* Ensure proper contrast for print */
+  .mantine-Badge-root {
+    border: 1px solid #333 !important;
+  }
+}
+
+

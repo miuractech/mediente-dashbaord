@@ -1,0 +1,170 @@
+Mediente_Production_Services_Complete_Flat
+Phase,Step,Task
+Conditions Precedent,Coordinate,Script
+Conditions Precedent,Coordinate,Desired Location reference
+Conditions Precedent,Coordinate,Production Services Agreement
+Conditions Precedent,Coordinate,Director and other creative elements
+Conditions Precedent,Execute,Tentative schedule
+Conditions Precedent,Execute,Tentative budget
+Conditions Precedent,Execute,Ideal shooting location vs rebate scenario vs logistical convenience
+Setting up Film,Coordinate,Chain of Title
+Setting up Film,Coordinate,HOD appointments
+Setting up Film,Coordinate,Script translation
+Setting up Film,Coordinate,Agreements under local law
+Setting up Film,Monitor,Cultural test compliance
+Setting up Film,Execute,Setup SPV Banking
+Setting up Film,Execute,Local Lawyer & Accountant appointment
+Setting up Film,Execute,Identify and appoint local production liaison (PT)
+Setting up Film,Execute,Identify and appoint Location Scout (PT)
+Setting up Film,Execute,"Schedule prelim scout with DR, DP, PD (PT)"
+Setting up Film,Execute,Initiate location permissions
+Setting up Film,Execute,"Identify Hotel, Catering and Transport options"
+Setting up Film,Execute,Prepare Tax credit application
+Setting up Film,Execute,Pay necessary fees
+Setting up Film,Execute,File tax credit application
+Pre-Production,Coordinate,Crew Hire
+Pre-Production,Coordinate,ADS
+Pre-Production,Coordinate,Team list
+Pre-Production,Coordinate,Requirement Breakdown (DT)
+Pre-Production,Coordinate,Storyboard
+Pre-Production,Coordinate,Directors schedule
+Pre-Production,Coordinate,Location breakdown
+Pre-Production,Coordinate,Picture vehicle requirement
+Pre-Production,Coordinate,VFX VFX breakdown
+Pre-Production,Coordinate,Action Action and SFX breakdown
+Pre-Production,Coordinate,Costume References & Breakdown
+Pre-Production,Coordinate,Art breakdown
+Pre-Production,Coordinate,HMU References
+Pre-Production,Coordinate,Casting Reference
+Pre-Production,Coordinate,Junior artist requirement
+Pre-Production,Coordinate,HODS
+Pre-Production,Coordinate,DP
+Pre-Production,Coordinate,Moodboard
+Pre-Production,Coordinate,"Camera, lighting & grip List"
+Pre-Production,Coordinate,Team list
+Pre-Production,Coordinate,Special equipment list & test
+Pre-Production,Coordinate,Camera test
+Pre-Production,Coordinate,Budget
+Pre-Production,Coordinate,PD
+Pre-Production,Coordinate,Moodboard
+Pre-Production,Coordinate,Team List
+Pre-Production,Coordinate,Construction/Set dec & Props requirements
+Pre-Production,Coordinate,Budget
+Pre-Production,Coordinate,CD
+Pre-Production,Coordinate,Moodboard
+Pre-Production,Coordinate,Team List
+Pre-Production,Coordinate,Making/Rental requirements
+Pre-Production,Coordinate,Budget
+Pre-Production,Coordinate,Look test
+Pre-Production,Coordinate,HMU
+Pre-Production,Coordinate,Moodboard
+Pre-Production,Coordinate,Team List
+Pre-Production,Coordinate,Procurement list
+Pre-Production,Coordinate,Budget
+Pre-Production,Coordinate,Look test
+Pre-Production,Coordinate,Editor
+Pre-Production,Coordinate,Editing timeline
+Pre-Production,Coordinate,Equipment list
+Pre-Production,Coordinate,Team list
+Pre-Production,Coordinate,Budget
+Pre-Production,Coordinate,Choreography
+Pre-Production,Coordinate,Requirements
+Pre-Production,Coordinate,Team list
+Pre-Production,Coordinate,Budget
+Pre-Production,Coordinate,Music Budget
+Pre-Production,Coordinate,Action Director
+Pre-Production,Coordinate,Team List
+Pre-Production,Coordinate,Action & Special requirements
+Pre-Production,Coordinate,Stuntviz
+Pre-Production,Coordinate,Budget
+Pre-Production,Coordinate,Rehearsal Schedule
+Pre-Production,Coordinate,On location sound
+Pre-Production,Coordinate,Team list
+Pre-Production,Coordinate,Equipment
+Pre-Production,Coordinate,Budget
+Pre-Production,Coordinate,VFX Supervisor
+Pre-Production,Coordinate,Identify Vendor
+Pre-Production,Coordinate,Breakdown
+Pre-Production,Coordinate,Timeline
+Pre-Production,Coordinate,Budget
+Pre-Production,Coordinate,Secondary Characters & Junior Artist
+Pre-Production,Coordinate,Actor’s workshop
+Pre-Production,Coordinate,Dialect coach
+Pre-Production,Coordinate,Action rehearsal
+Pre-Production,Coordinate,Dance rehearsal
+Pre-Production,Coordinate,Specific talent rehearsal
+Pre-Production,Coordinate,Tech recce with HODS Crew and HOD script reading
+Pre-Production,Monitor,Shot Breakdown (DT)
+Pre-Production,Monitor,Set Construction
+Pre-Production,Monitor,Cultural test compliance
+Pre-Production,Execute,Scoping out the production
+Pre-Production,Execute,Number of hotel rooms and types
+Pre-Production,Execute,Location Base Infrastructure
+Pre-Production,Execute,"Number of cars, vans etc"
+Pre-Production,Execute,Storage spaces
+Pre-Production,Execute,Crew & equipment movement
+Pre-Production,Execute,Vendor identification and appointment
+Pre-Production,Execute,Camera
+Pre-Production,Execute,Lights & Grips
+Pre-Production,Execute,Vanity & Sanitation
+Pre-Production,Execute,Craft & Production boys
+Pre-Production,Execute,Vehicles
+Pre-Production,Execute,Storage Room/Godown
+Pre-Production,Execute,Catering
+Pre-Production,Execute,Final budget and schedule
+Pre-Production,Execute,Block crew dates
+Pre-Production,Execute,Apply for visas
+Pre-Production,Execute,Ticketing
+Pre-Production,Execute,Setup local production office
+Pre-Production,Execute,Contracts
+Pre-Production,Execute,Vendors
+Pre-Production,Execute,Crew
+Pre-Production,Execute,Crew payments
+Pre-Production,Execute,Weekly Accounts
+Pre-Production,Execute,Insurance
+Pre-Production,Execute,Production Insurance
+Pre-Production,Execute,Keyman insurance
+Pre-Production,Execute,E & O
+Film Production,Coordinate,Action & Previz rehearsals with Action director (Separate Unit)
+Film Production,Coordinate,Advance scheduling & planning
+Film Production,Coordinate,Daily crew huddle & meetings
+Film Production,Coordinate,Camera & Special Equipments
+Film Production,Coordinate,On set VFX & Liaison
+Film Production,Coordinate,BTS & Still
+Film Production,Coordinate,Crew & HODs requirements fulfilment
+Film Production,Monitor,On set editor
+Film Production,Monitor,DT
+Film Production,Monitor,DPR & WPR
+Film Production,Monitor,Continuity & Juniors supervision
+Film Production,Monitor,Creative coordination with other departments to keep them informed of creative and on set changes (DT)
+Film Production,Monitor,Schedule for 2nd Unit
+Film Production,Monitor,Creative coordination with other HODs
+Film Production,Monitor,Footage safety & masters backup
+Film Production,Monitor,Deliver footage to the lab
+Film Production,Monitor,Dailies & Workflow transportation
+Film Production,Monitor,Female crew safety
+Film Production,Monitor,Technical dry runs
+Film Production,Monitor,Inventory management
+Film Production,Monitor,PD Set construction (PD)
+Film Production,Monitor,Schedule & Budget compliance
+Film Production,Monitor,Cultural test compliance
+Film Production,Execute,On Set Visits and Base identification
+Film Production,Execute,Prior budget approval for the art
+Film Production,Execute,Vanities & Generators up and running
+Film Production,Execute,Call Sheets delivery to the crew
+Film Production,Execute,Advance setup & keeping the schedule on track
+Film Production,Execute,Daily pre-call & post pack-up meetings
+Film Production,Execute,2nd Unit Shooting plan & unit setup from the production
+Film Production,Execute,On set audit
+Film Production,Execute,Daily payrolls
+Film Production,Execute,On location bills & vendors payments
+Film Production,Execute,Waiver contracts
+Film Production,Execute,Keeping track of the budget
+Film Production,Execute,Daily catering & Dietary preferences
+Film Production,Execute,Crew sustenance
+Film Production,Execute,Talent security & Bouncers
+Film Production,Execute,Daily transport plan
+Film Production,Execute,On set health & safety
+Film Production,Execute,Location strike
+Film Production,Execute,Marketing
+Post-Production,,

@@ -1,0 +1,32 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+
+**Module File Structure Convention**
+Maintain the following structure for each module:
+
+```
+src/
+  module/
+    module.service.ts              // Business logic and service functions
+    module.type.ts                 // TypeScript types and interfaces
+    module.hook.ts                 // Custom React hooks
+    module_component.service.tsx  // UI-related services or components
+  pages/
+    module.tsx                     // Page-level component or entry point
+
+sql/
+  module.sql                       // SQL scripts related to the module
+```
+
+> ✅ **Always follow this file structure when creating or updating modules.**
+
+---
+supabase for backend
+don't create any sample data.   
+---
+always break down to simple components
+check if any existing code can be resused like utils, etc
+write only code. no long explanation of what you did, affirmations, key changes, etc. write only code and keep it short.
