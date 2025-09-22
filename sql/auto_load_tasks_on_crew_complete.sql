@@ -49,7 +49,7 @@ BEGIN
     RAISE NOTICE 'Auto-starting project % - all roles filled', p_project_id;
     
     -- Load first step tasks
-    IF load_next_step_tasks(p_project_id) THEN
+    IF load_next_phase_tasks(p_project_id) THEN
         -- Update project status to active if not already
         IF project_status_var != 'active' THEN
             UPDATE projects 

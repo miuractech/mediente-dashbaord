@@ -641,12 +641,12 @@ class ProjectService {
     if (error) throw new Error(`Failed to assign multiple crew to task: ${error.message}`);
   }
 
-  async loadNextStepTasks(projectId: string): Promise<boolean> {
-    const { data, error } = await supabase.rpc('load_next_step_tasks', {
+  async loadNextPhaseTasks(projectId: string): Promise<boolean> {
+    const { data, error } = await supabase.rpc('load_next_phase_tasks', {
       p_project_id: projectId,
     });
 
-    if (error) throw new Error(`Failed to load next step tasks: ${error.message}`);
+    if (error) throw new Error(`Failed to load next phase tasks: ${error.message}`);
     return data;
   }
 
@@ -819,7 +819,7 @@ class ProjectService {
     }
 
     // Load first step tasks
-    const loaded = await this.loadNextStepTasks(projectId);
+    const loaded = await this.loadNextPhaseTasks(projectId);
     if (!loaded) {
       throw new Error('Failed to load initial tasks');
     }

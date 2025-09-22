@@ -107,8 +107,8 @@ ORDER BY p.created_at DESC;
 -- 6. TEST LOAD_NEXT_STEP_TASKS FUNCTION MANUALLY
 -- =====================================================
 
--- Create a test function to debug load_next_step_tasks
-CREATE OR REPLACE FUNCTION debug_load_next_step_tasks(p_project_id UUID)
+-- Create a test function to debug load_next_phase_tasks
+CREATE OR REPLACE FUNCTION debug_load_next_phase_tasks(p_project_id UUID)
 RETURNS TABLE(
     debug_step VARCHAR,
     debug_message TEXT,
@@ -235,7 +235,7 @@ To debug a specific project, run:
    SELECT * FROM projects WHERE project_name = 'YOUR_PROJECT_NAME';
 
 2. Then run the debug function:
-   SELECT * FROM debug_load_next_step_tasks('YOUR_PROJECT_ID');
+   SELECT * FROM debug_load_next_phase_tasks('YOUR_PROJECT_ID');
 
 3. Check template structure:
    SELECT jsonb_pretty(template_snapshot) FROM projects WHERE project_id = 'YOUR_PROJECT_ID';
@@ -244,7 +244,7 @@ To debug a specific project, run:
    SELECT * FROM project_roles WHERE project_id = 'YOUR_PROJECT_ID';
 
 5. Manually test the function:
-   SELECT load_next_step_tasks('YOUR_PROJECT_ID');
+   SELECT load_next_phase_tasks('YOUR_PROJECT_ID');
 */
 
 SELECT 'Debug script created successfully!' as status,

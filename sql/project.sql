@@ -319,8 +319,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Function to load next step tasks with empty step skipping
-CREATE OR REPLACE FUNCTION load_next_step_tasks(p_project_id UUID)
+-- Function to load all tasks from the next phase
+CREATE OR REPLACE FUNCTION load_next_phase_tasks(p_project_id UUID)
 RETURNS BOOLEAN AS $$
 DECLARE
     project_record RECORD;
@@ -328,9 +328,7 @@ DECLARE
     step_data JSONB;
     task_data JSONB;
     next_phase_order INTEGER;
-    next_step_order INTEGER;
     current_phase_order INTEGER;
-    current_step_order INTEGER;
     tasks_loaded INTEGER := 0;
     parent_task_id UUID;
     template_parent_id UUID;
@@ -344,63 +342,54 @@ BEGIN
         RETURN FALSE;
     END IF;
 
-    -- Check if there are any loaded tasks
-    SELECT phase_order, step_order INTO current_phase_order, current_step_order
+    -- Check if there are any loaded tasks and find current phase
+    SELECT phase_order INTO current_phase_order
     FROM project_tasks 
     WHERE project_id = p_project_id 
     AND is_loaded = true 
-    ORDER BY phase_order DESC, step_order DESC 
+    ORDER BY phase_order DESC 
     LIMIT 1;
 
-    -- If no loaded tasks, start with first phase, first step
-    IF current_phase_order IS NULL OR current_step_order IS NULL THEN
-        RAISE NOTICE 'No loaded tasks found, starting with phase 1, step 1 for project %', p_project_id;
+    -- If no loaded tasks, start with first phase
+    IF current_phase_order IS NULL THEN
+        RAISE NOTICE 'No loaded tasks found, starting with phase 1 for project %', p_project_id;
         next_phase_order := 1;
-        next_step_order := 1;
     ELSE
-        RAISE NOTICE 'Current loaded step: phase %, step % for project %', current_phase_order, current_step_order, p_project_id;
-        -- Check if all tasks in current step are completed
+        RAISE NOTICE 'Current loaded phase: % for project %', current_phase_order, p_project_id;
+        -- Check if all tasks in current phase are completed
         IF EXISTS (
             SELECT 1 FROM project_tasks 
             WHERE project_id = p_project_id 
             AND phase_order = current_phase_order 
-            AND step_order = current_step_order 
             AND task_status != 'completed'
             AND is_loaded = true
         ) THEN
-            RAISE NOTICE 'Current step not completed yet for project %', p_project_id;
-            RETURN FALSE; -- Current step not completed yet
+            RAISE NOTICE 'Current phase not completed yet for project %', p_project_id;
+            RETURN FALSE; -- Current phase not completed yet
         END IF;
 
-        -- Find next step (could be empty, we'll handle that)
-        SELECT phase_order, step_order INTO next_phase_order, next_step_order
-        FROM (
-            SELECT 
-                (phase->'phase'->>'phase_order')::INTEGER as phase_order,
-                (step->'step'->>'step_order')::INTEGER as step_order
-            FROM jsonb_array_elements(project_record.template_snapshot->'phases') as phase,
-                 jsonb_array_elements(phase->'steps') as step
-            WHERE (phase->'phase'->>'phase_order')::INTEGER > current_phase_order
-               OR ((phase->'phase'->>'phase_order')::INTEGER = current_phase_order 
-                   AND (step->'step'->>'step_order')::INTEGER > current_step_order)
-            ORDER BY phase_order, step_order
-            LIMIT 1
-        ) next_step;
-
-        IF next_phase_order IS NULL THEN
+        -- Find next phase
+        next_phase_order := current_phase_order + 1;
+        
+        -- Check if next phase exists in template
+        IF NOT EXISTS (
+            SELECT 1 
+            FROM jsonb_array_elements(project_record.template_snapshot->'phases') as phase
+            WHERE (phase->'phase'->>'phase_order')::INTEGER = next_phase_order
+        ) THEN
             -- Project completed
-            RAISE NOTICE 'Project completed, no more steps to load for project %', p_project_id;
+            RAISE NOTICE 'Project completed, no more phases to load for project %', p_project_id;
             UPDATE projects 
             SET project_status = 'completed', updated_at = NOW()
             WHERE project_id = p_project_id;
             RETURN FALSE;
         END IF;
         
-        RAISE NOTICE 'Loading next step: phase %, step % for project %', next_phase_order, next_step_order, p_project_id;
+        RAISE NOTICE 'Loading next phase: % for project %', next_phase_order, p_project_id;
     END IF;
 
-    -- Load tasks for the next step (with empty step handling)
-    <<step_loop>>
+    -- Load all tasks for the entire phase (across all steps)
+    <<phase_loop>>
     LOOP
         tasks_loaded := 0;
         
@@ -408,9 +397,10 @@ BEGIN
             SELECT value as phase FROM jsonb_array_elements(project_record.template_snapshot->'phases')
             WHERE (value->'phase'->>'phase_order')::INTEGER = next_phase_order
         LOOP
+            -- Loop through all steps in this phase
             FOR step_data IN 
                 SELECT value as step FROM jsonb_array_elements(phase_data->'steps')
-                WHERE (value->'step'->>'step_order')::INTEGER = next_step_order
+                ORDER BY (value->'step'->>'step_order')::INTEGER
             LOOP
                 -- Load tasks in order, respecting parent-child relationships
                 FOR task_data IN 
@@ -442,7 +432,7 @@ BEGIN
                         phase_data->'phase'->>'phase_name',
                         next_phase_order,
                         step_data->'step'->>'step_name',
-                        next_step_order,
+                        (step_data->'step'->>'step_order')::INTEGER,
                         (task_data->>'task_order')::INTEGER,
                         (task_data->>'estimated_hours')::INTEGER,
                         parent_task_id,
@@ -457,46 +447,37 @@ BEGIN
             END LOOP;
         END LOOP;
 
-        -- If no tasks were loaded for this step, skip to next step
+        -- If no tasks were loaded for this phase, skip to next phase
         IF tasks_loaded = 0 THEN
-            RAISE NOTICE 'Step % in phase % is empty, skipping to next step', next_step_order, next_phase_order;
+            RAISE NOTICE 'Phase % is empty, skipping to next phase', next_phase_order;
             
-            -- Find next step after the empty one
-            SELECT phase_order, step_order INTO next_phase_order, next_step_order
-            FROM (
-                SELECT 
-                    (phase->'phase'->>'phase_order')::INTEGER as phase_order,
-                    (step->'step'->>'step_order')::INTEGER as step_order
-                FROM jsonb_array_elements(project_record.template_snapshot->'phases') as phase,
-                     jsonb_array_elements(phase->'steps') as step
-                WHERE (phase->'phase'->>'phase_order')::INTEGER > next_phase_order
-                   OR ((phase->'phase'->>'phase_order')::INTEGER = next_phase_order 
-                       AND (step->'step'->>'step_order')::INTEGER > next_step_order)
-                ORDER BY phase_order, step_order
-                LIMIT 1
-            ) next_step;
+            -- Move to next phase
+            next_phase_order := next_phase_order + 1;
 
-            -- If no more steps, project is completed
-            IF next_phase_order IS NULL THEN
-                RAISE NOTICE 'No more steps found, project completed for project %', p_project_id;
+            -- Check if next phase exists
+            IF NOT EXISTS (
+                SELECT 1 
+                FROM jsonb_array_elements(project_record.template_snapshot->'phases') as phase
+                WHERE (phase->'phase'->>'phase_order')::INTEGER = next_phase_order
+            ) THEN
+                RAISE NOTICE 'No more phases found, project completed for project %', p_project_id;
                 UPDATE projects 
                 SET project_status = 'completed', updated_at = NOW()
                 WHERE project_id = p_project_id;
                 RETURN FALSE;
             END IF;
             
-            -- Continue loop with next step
-            CONTINUE step_loop;
+            -- Continue loop with next phase
+            CONTINUE phase_loop;
         ELSE
             -- Tasks were loaded, exit loop
-            EXIT step_loop;
+            EXIT phase_loop;
         END IF;
-    END LOOP step_loop;
+    END LOOP phase_loop;
 
-    -- Update project current phase/step
+    -- Update project current phase
     UPDATE projects 
     SET current_phase_id = gen_random_uuid(), -- Placeholder, could be improved
-        current_step_id = gen_random_uuid(),   -- Placeholder, could be improved
         updated_at = NOW()
     WHERE project_id = p_project_id;
 
@@ -506,7 +487,7 @@ BEGIN
     -- Auto-assign crew to tasks based on template role assignments
     PERFORM auto_assign_crew_to_loaded_tasks(p_project_id);
 
-    RAISE NOTICE 'Successfully loaded % tasks for phase %, step % in project %', tasks_loaded, next_phase_order, next_step_order, p_project_id;
+    RAISE NOTICE 'Successfully loaded % tasks for phase % in project %', tasks_loaded, next_phase_order, p_project_id;
     RETURN TRUE;
 END;
 $$ LANGUAGE plpgsql;
@@ -801,23 +782,22 @@ BEGIN
         NEW.escalated_at = NOW();
     END IF;
 
-    -- Try to load next step when current step is completed
+    -- Try to load next phase when current phase is completed
     IF NEW.task_status = 'completed' THEN
-        -- Check if all tasks in current step are completed and load next step
+        -- Check if all tasks in current phase are completed and load next phase
         IF NOT EXISTS (
             SELECT 1 FROM project_tasks 
             WHERE project_id = NEW.project_id 
             AND phase_order = NEW.phase_order 
-            AND step_order = NEW.step_order 
             AND task_status != 'completed'
             AND is_loaded = true
             AND project_task_id != NEW.project_task_id
         ) THEN
-            -- All tasks in current step are completed, load next step
-            RAISE NOTICE 'All tasks in step completed for project %, loading next step', NEW.project_id;
-            PERFORM load_next_step_tasks(NEW.project_id);
+            -- All tasks in current phase are completed, load next phase
+            RAISE NOTICE 'All tasks in phase completed for project %, loading next phase', NEW.project_id;
+            PERFORM load_next_phase_tasks(NEW.project_id);
         ELSE
-            RAISE NOTICE 'Some tasks still incomplete in step for project %', NEW.project_id;
+            RAISE NOTICE 'Some tasks still incomplete in phase for project %', NEW.project_id;
         END IF;
     END IF;
 
@@ -1013,7 +993,7 @@ COMMENT ON COLUMN project_tasks.is_custom IS 'Whether this is a user-added custo
 COMMENT ON COLUMN project_tasks.deadline IS 'Calculated deadline based on start time and estimated hours';
 
 COMMENT ON FUNCTION create_project_from_template(VARCHAR, TEXT, TEXT, DATE, UUID, VARCHAR) IS 'Create a new project from a template with role setup';
-COMMENT ON FUNCTION load_next_step_tasks(UUID) IS 'Load tasks for the next step in progressive workflow';
+COMMENT ON FUNCTION load_next_phase_tasks(UUID) IS 'Load all tasks for the next phase in progressive workflow';
 COMMENT ON FUNCTION escalate_overdue_tasks() IS 'Escalate tasks that have passed their deadlines';
 COMMENT ON FUNCTION can_project_start(UUID) IS 'Check if all required roles are filled to start project';
 

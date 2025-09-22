@@ -1119,7 +1119,7 @@ export function useLoadNextStepTasks() {
   const loadNextStep = useCallback(async (projectId: string): Promise<boolean> => {
     try {
       setLoading(true);
-      const result = await projectService.loadNextStepTasks(projectId);
+      const result = await projectService.loadNextPhaseTasks(projectId);
       if (result) {
         notifications.show({
           title: 'Success',
@@ -1204,7 +1204,7 @@ export function useCurrentStepCompletion(projectId: string | null) {
       if (completed && !isCompleted && !autoLoadingNext) {
         setAutoLoadingNext(true);
         try {
-          const success = await projectService.loadNextStepTasks(projectId);
+          const success = await projectService.loadNextPhaseTasks(projectId);
           if (success) {
             notifications.show({
               title: 'Step Completed! 🎉',

@@ -10,7 +10,7 @@
 -- 1. UPDATED LOAD_NEXT_STEP_TASKS FUNCTION
 -- =====================================================
 -- Function to load next step tasks with empty step skipping
-CREATE OR REPLACE FUNCTION load_next_step_tasks(p_project_id UUID)
+CREATE OR REPLACE FUNCTION load_next_phase_tasks(p_project_id UUID)
 RETURNS BOOLEAN AS $$
 DECLARE
     project_record RECORD;
@@ -441,7 +441,7 @@ BEGIN
         ) THEN
             -- All tasks in current step are completed, load next step
             RAISE NOTICE 'All tasks in step completed for project %, loading next step', NEW.project_id;
-            PERFORM load_next_step_tasks(NEW.project_id);
+            PERFORM load_next_phase_tasks(NEW.project_id);
         ELSE
             RAISE NOTICE 'Some tasks still incomplete in step for project %', NEW.project_id;
         END IF;

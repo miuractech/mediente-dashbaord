@@ -137,7 +137,7 @@ BEGIN
         ) THEN
             -- All tasks in current step are completed, load next step
             RAISE NOTICE 'All tasks in step completed for project %, loading next step', NEW.project_id;
-            PERFORM load_next_step_tasks(NEW.project_id);
+            PERFORM load_next_phase_tasks(NEW.project_id);
         ELSE
             RAISE NOTICE 'Some tasks still incomplete in step for project %', NEW.project_id;
         END IF;
