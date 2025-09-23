@@ -17,6 +17,8 @@ const Dashboard = lazy(() => import('./pages/dashboard'));
 const AdminUserManagement = lazy(() => import('./pages/AdminUserManagement'));
 const Projects = lazy(() => import('./pages/Projects'));
 const ProjectDetail = lazy(() => import('./pages/ProjectDetail'));
+const ProjectTasksView = lazy(() => import('./pages/ProjectTasksView'));
+const ProjectCalendarView = lazy(() => import('./pages/ProjectCalendarView'));
 const ProjectCrewAssignment = lazy(() => import('./pages/ProjectCrewAssignment'));
 const ProjectCrewManagement = lazy(() => import('./pages/ProjectCrewManagement'));
 const AdminTeams = lazy(() => import('./pages/AdminTeams'));
@@ -60,6 +62,8 @@ function App() {
                 <Route path="users" element={<AdminUserManagement />} />
                 <Route path="projects" element={<Projects />} />
                 <Route path="projects/:projectId" element={<ProjectDetail />} />
+                <Route path="projects/:projectId/tasks" element={<ProjectTasksView />} />
+                <Route path="projects/:projectId/calendar" element={<ProjectCalendarView />} />
                 <Route path="projects/:projectId/tasks/:taskId" element={<TaskDetailPage />} />
                 <Route path="projects/:projectId/crew-assignment" element={<ProjectCrewAssignment />} />
                 <Route path="projects/:projectId/crew-management" element={<ProjectCrewManagement />} />
