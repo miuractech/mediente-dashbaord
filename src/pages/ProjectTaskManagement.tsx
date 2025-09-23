@@ -156,11 +156,11 @@ export default function ProjectTaskManagement() {
             )}
 
             <Group gap="md" mb="sm">
-              {task.estimated_hours && (
+              {task.estimated_days && (
                 <Group gap={4}>
                   <IconClock size={12} />
                   <Text size="xs" c="dimmed">
-                    {task.estimated_hours}h
+                    {task.estimated_days}d
                   </Text>
                 </Group>
               )}

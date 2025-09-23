@@ -16,7 +16,8 @@ import {
   Center,
   Tabs,
   Pagination,
-  Menu
+  Menu,
+  SegmentedControl
 } from '@mantine/core';
 import { 
   IconPlus, 
@@ -54,7 +55,10 @@ import GenericConfirmationDialog from '../components/GenericConfirmationDialog';
 import DuplicateTemplateModal from '../template/DuplicateTemplateModal';
 import { CopyTasksModal } from '../template/CopyTasksModal';
 import { CopyStepModal } from '../template/CopyStepModal';
-import { DraggablePhasesList, DraggableTasksList, DraggablePhaseTasksList } from '../template/DraggableTemplateList';
+import { DraggableTasksList } from '../template/DraggableTemplateList';
+import { DraggablePhaseStepTasksList } from '../template/DraggablePhaseStepTasksList';
+import { DraggableTemplateTasksList } from '../template/DraggableTemplateTasksList';
+import { SimpleTemplateTasksList } from '../template/SimpleTemplateTasksList';
 
 interface PathSegment {
   type: 'template' | 'phase' | 'step';
@@ -75,9 +79,10 @@ export default function TemplatesPage() {
   
   // Data states
   const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
-  const [phases, setPhases] = useState<TemplatePhase[]>([]);
   const [tasks, setTasks] = useState<StepTask[]>([]);
   const [phaseTasks, setPhaseTasks] = useState<(StepTask & { step_name: string; step_order: number })[]>([]);
+  const [templateTasks, setTemplateTasks] = useState<(StepTask & { step_name: string; step_order: number; phase_name: string; phase_order: number })[]>([]);
+  const [templatePhases, setTemplatePhases] = useState<TemplatePhase[]>([]);
   const [phaseSteps, setPhaseSteps] = useState<PhaseStep[]>([]);
   const [roles, setRoles] = useState<TemplateRole[]>([]);
   const [templateRoles, setTemplateRoles] = useState<TemplateRoleUsage[]>([]);
@@ -86,12 +91,15 @@ export default function TemplatesPage() {
   const [rolesPage, setRolesPage] = useState(1);
   const rolesPerPage = 10;
   
+  // View mode state - default to 'simple'
+  const [viewMode, setViewMode] = useState<'simple' | 'grouped'>('simple');
+  
   // Loading states
   const [loading, setLoading] = useState(false);
   
   // Modal states
   const [templateModalOpened, { open: openTemplateModal, close: closeTemplateModal }] = useDisclosure(false);
-  const [phaseModalOpened, { open: openPhaseModal, close: closePhaseModal }] = useDisclosure(false);
+  const [phaseModalOpened, { close: closePhaseModal }] = useDisclosure(false);
   const [stepModalOpened, { close: closeStepModal }] = useDisclosure(false);
   const [taskModalOpened, { open: openTaskModal, close: closeTaskModal }] = useDisclosure(false);
   const [deleteModalOpened, { open: openDeleteModal, close: closeDeleteModal }] = useDisclosure(false);
@@ -180,14 +188,16 @@ export default function TemplatesPage() {
         const templatesData = await projectTemplateService.getAll();
         setTemplates(templatesData);
       } else if (path.length === 1) {
-        // Phases view
+        // Template view - load all tasks from all phases in the template
         const templateId = path[0].id;
-        const [phasesData, templateRolesData] = await Promise.all([
-          templatePhaseService.getByTemplateId(templateId),
-          templateRoleUsageService.getTemplateRoles(templateId)
+        const [templateRolesData, templateTasksData, templatePhasesData] = await Promise.all([
+          templateRoleUsageService.getTemplateRoles(templateId),
+          stepTaskService.getByTemplateId(templateId),
+          templatePhaseService.getByTemplateId(templateId)
         ]);
-        setPhases(phasesData);
         setTemplateRoles(templateRolesData);
+        setTemplateTasks(templateTasksData);
+        setTemplatePhases(templatePhasesData);
         setRolesPage(1); // Reset pagination when switching templates
       } else if (path.length === 2) {
         // Phase tasks view - show all tasks from all steps in this phase
@@ -226,13 +236,6 @@ export default function TemplatesPage() {
     navigate(`/admin/templates/${template.template_id}`);
   };
 
-  const navigateToTasks = (phase: TemplatePhase) => {
-    if (path.length === 1) {
-      const templateId = path[0].id;
-      navigate(`/admin/templates/${templateId}/${phase.phase_id}`);
-    }
-  };
-
   // Remove the step-level navigation since we're eliminating that level
 
   const navigateToBreadcrumb = (index: number) => {
@@ -259,9 +262,9 @@ export default function TemplatesPage() {
       setEditingTemplate(item as ProjectTemplate);
       openTemplateModal();
     } else if (path.length === 1) {
-      // Phases view
-      setEditingPhase(item as TemplatePhase);
-      openPhaseModal();
+      // Template view - editing tasks from all phases
+      setEditingTask(item as StepTask);
+      openTaskModal();
     } else if (path.length === 2) {
       // Phase tasks view - editing tasks
       setEditingTask(item as StepTask);
@@ -283,10 +286,10 @@ export default function TemplatesPage() {
       id = item.template_id;
       name = item.template_name;
     } else if (path.length === 1) {
-      // Phases view
-      type = 'phases';
-      id = item.phase_id;
-      name = item.phase_name;
+      // Template view - deleting tasks from all phases
+      type = 'tasks';
+      id = item.task_id;
+      name = item.task_name;
     } else if (path.length === 2) {
       // Phase tasks view
       type = 'tasks';
@@ -308,7 +311,15 @@ export default function TemplatesPage() {
   // Copy handlers for legacy support
 
   const handleCopyTasks = () => {
-    if (path.length === 2 && phaseTasks.length > 0) {
+    if (path.length === 1 && templateTasks.length > 0) {
+      // For template-level copying, we'll copy from the first step that has tasks
+      const firstTaskStep = templateTasks[0];
+      setTasksToCopy({ 
+        stepId: firstTaskStep.step_id, 
+        stepName: firstTaskStep.step_name 
+      });
+      openCopyTasksModal();
+    } else if (path.length === 2 && phaseTasks.length > 0) {
       // For phase-level copying, we'll copy from the first step that has tasks
       const firstTaskStep = phaseTasks[0];
       setTasksToCopy({ 
@@ -373,45 +384,6 @@ export default function TemplatesPage() {
     return role ? `${role.role_name}` : 'Unknown Role';
   };
 
-  // Reorder handlers with optimistic updates
-  const handleReorderPhases = async (reorderedPhases: TemplatePhase[]) => {
-    if (path.length !== 1) return;
-    
-    const templateId = path[0].id;
-    const originalPhases = [...phases]; // Store original order for rollback
-    
-    // Immediate UI update (optimistic)
-    setPhases(reorderedPhases);
-    
-    try {
-      const phaseOrders = reorderedPhases.map(phase => ({
-        phase_id: phase.phase_id,
-        phase_order: phase.phase_order
-      }));
-
-      await templatePhaseService.reorder(templateId, phaseOrders);
-      
-      // Success notification (optional, can be removed for less noise)
-      notifications.show({
-        title: 'Success',
-        message: 'Phases reordered successfully',
-        color: 'green',
-        autoClose: 2000
-      });
-    } catch (error) {
-      console.error('Error reordering phases:', error);
-      
-      // Rollback to original order on error
-      setPhases(originalPhases);
-      
-      notifications.show({
-        title: 'Error',
-        message: 'Failed to reorder phases. Order has been restored.',
-        color: 'red'
-      });
-    }
-  };
-
   // Legacy step reorder function - removed since we no longer show step view
 
   const handleReorderTasks = async (reorderedTasks: StepTask[]) => {
@@ -455,18 +427,6 @@ export default function TemplatesPage() {
   const handleReorderPhaseTasks = async (reorderedTasks: (StepTask & { step_name: string; step_order: number })[]) => {
     if (path.length !== 2) return;
     
-    // Group tasks by step for reordering
-    const tasksByStep = new Map<string, StepTask[]>();
-    reorderedTasks.forEach((task) => {
-      if (!tasksByStep.has(task.step_id)) {
-        tasksByStep.set(task.step_id, []);
-      }
-      tasksByStep.get(task.step_id)!.push({
-        ...task,
-        task_order: tasksByStep.get(task.step_id)!.length + 1
-      });
-    });
-    
     const originalTasks = [...phaseTasks]; // Store original order for rollback
     
     // Immediate UI update (optimistic)
@@ -476,14 +436,13 @@ export default function TemplatesPage() {
     })));
     
     try {
-      // Reorder tasks within each step
-      for (const [stepId, stepTasks] of tasksByStep) {
-        const taskOrders = stepTasks.map((task, idx) => ({
-          task_id: task.task_id,
-          task_order: idx + 1
-        }));
-        await stepTaskService.reorder(stepId, taskOrders);
-      }
+      // Use global template reordering for cross-step task reordering within a phase
+      const taskOrders = reorderedTasks.map((task, idx) => ({
+        task_id: task.task_id,
+        task_order: idx + 1
+      }));
+
+      await stepTaskService.reorderGlobally(path[0].id, taskOrders);
       
       notifications.show({
         title: 'Success',
@@ -496,6 +455,46 @@ export default function TemplatesPage() {
       
       // Rollback to original order on error
       setPhaseTasks(originalTasks);
+      
+      notifications.show({
+        title: 'Error',
+        message: 'Failed to reorder tasks. Order has been restored.',
+        color: 'red'
+      });
+    }
+  };
+
+  const handleReorderTemplateTasks = async (reorderedTasks: (StepTask & { step_name: string; step_order: number; phase_name: string; phase_order: number })[]) => {
+    if (path.length !== 1) return;
+    
+    const originalTasks = [...templateTasks]; // Store original order for rollback
+    
+    // Immediate UI update (optimistic)
+    setTemplateTasks(reorderedTasks.map((task, idx) => ({
+      ...task,
+      task_order: idx + 1
+    })));
+    
+    try {
+      // Use global template reordering for cross-step/phase task reordering
+      const taskOrders = reorderedTasks.map((task, idx) => ({
+        task_id: task.task_id,
+        task_order: idx + 1
+      }));
+
+      await stepTaskService.reorderGlobally(path[0].id, taskOrders);
+      
+      notifications.show({
+        title: 'Success',
+        message: 'Tasks reordered successfully',
+        color: 'green',
+        autoClose: 2000
+      });
+    } catch (error) {
+      console.error('Error reordering template tasks:', error);
+      
+      // Rollback to original order on error
+      setTemplateTasks(originalTasks);
       
       notifications.show({
         title: 'Error',
@@ -583,36 +582,37 @@ export default function TemplatesPage() {
             <Text c="dimmed">No templates found</Text>
           </Center>
         ) : (
-          <Table>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Name</Table.Th>
-                <Table.Th>Description</Table.Th>
-                <Table.Th>Created</Table.Th>
-                <Table.Th>Actions</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {templates.map((template) => (
-                <Table.Tr 
-                  key={template.template_id}
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => navigateToPhases(template)}
-                >
-                  <Table.Td>
-                    <Text fw={500}>{template.template_name}</Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="sm" c="dimmed" lineClamp={2}>
-                      {template.description || 'No description'}
-                    </Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="sm" c="dimmed">
-                      {new Date(template.created_at).toLocaleDateString()}
-                    </Text>
-                  </Table.Td>
-                  <Table.Td>
+          <div style={{ overflowX: 'auto', width: '100%' }}>
+            <Table style={{ minWidth: '800px' }}>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th style={{ minWidth: '200px' }}>Name</Table.Th>
+                  <Table.Th style={{ minWidth: '300px' }}>Description</Table.Th>
+                  <Table.Th style={{ minWidth: '150px' }}>Created</Table.Th>
+                  <Table.Th style={{ minWidth: '120px', position: 'sticky', right: 0, backgroundColor: 'white', zIndex: 1, borderLeft: '1px solid #dee2e6' }}>Actions</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {templates.map((template) => (
+                  <Table.Tr 
+                    key={template.template_id}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => navigateToPhases(template)}
+                  >
+                    <Table.Td>
+                      <Text fw={500}>{template.template_name}</Text>
+                    </Table.Td>
+                    <Table.Td>
+                      <Text size="sm" c="dimmed" lineClamp={2}>
+                        {template.description || 'No description'}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td>
+                      <Text size="sm" c="dimmed">
+                        {new Date(template.created_at).toLocaleDateString()}
+                      </Text>
+                    </Table.Td>
+                  <Table.Td style={{ position: 'sticky', right: 0, backgroundColor: 'white', zIndex: 1, borderLeft: '1px solid #dee2e6' }}>
                     <Menu shadow="md" width={200}>
                       <Menu.Target>
                         <ActionIcon 
@@ -665,10 +665,11 @@ export default function TemplatesPage() {
                       </Menu.Dropdown>
                     </Menu>
                   </Table.Td>
-                </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </div>
         )}
       </Stack>
     </Card>
@@ -683,36 +684,61 @@ export default function TemplatesPage() {
 
     return (
       <Card>
-        <Tabs defaultValue="phases">
+        <Tabs defaultValue="tasks">
           <Tabs.List>
-            <Tabs.Tab value="phases">Phases ({phases.length})</Tabs.Tab>
+            <Tabs.Tab value="tasks">All Tasks ({templateTasks.length})</Tabs.Tab>
             <Tabs.Tab value="roles">Roles ({templateRoles.length})</Tabs.Tab>
           </Tabs.List>
 
-          <Tabs.Panel value="phases" pt="md">
+          <Tabs.Panel value="tasks" pt="md">
             <Stack>
               <Group justify="space-between">
-                <Title order={3}>Template Phases</Title>
-                <Button leftSection={<IconPlus size={16} />} onClick={openPhaseModal}>
-                  Create Phase
-                </Button>
+                <Title order={3}>Template Tasks</Title>
+                <Group>
+                  <SegmentedControl
+                    value={viewMode}
+                    onChange={(value) => setViewMode(value as 'simple' | 'grouped')}
+                    data={[
+                      { label: 'Simple List', value: 'simple' },
+                      { label: 'Grouped View', value: 'grouped' },
+                    ]}
+                    size="sm"
+                  />
+                  <Button leftSection={<IconPlus size={16} />} onClick={openTaskModal}>
+                    Create Task
+                  </Button>
+                </Group>
               </Group>
               
               {loading ? (
                 <Center p="xl">
                   <Loader />
                 </Center>
-              ) : phases.length === 0 ? (
+              ) : templateTasks.length === 0 ? (
                 <Center p="xl">
-                  <Text c="dimmed">No phases found</Text>
+                  <Text c="dimmed">No tasks found in this template</Text>
                 </Center>
-              ) : (
-                <DraggablePhasesList
-                  phases={phases}
-                  onReorder={handleReorderPhases}
+              ) : viewMode === 'simple' ? (
+                <SimpleTemplateTasksList
+                  tasks={templateTasks}
+                  onReorder={handleReorderTemplateTasks}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
-                  onView={(phase) => navigateToTasks(phase)}
+                  onCreateChild={handleCreateChildTask}
+                  onCopyTasks={handleCopyTasks}
+                  getRoleName={getRoleName}
+                  templateId={path.length > 0 ? path[0].id : ''}
+                />
+              ) : (
+                <DraggableTemplateTasksList
+                  tasks={templateTasks}
+                  onReorder={handleReorderTemplateTasks}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  onCreateChild={handleCreateChildTask}
+                  onCopyTasks={handleCopyTasks}
+                  getRoleName={getRoleName}
+                  templateId={path.length > 0 ? path[0].id : ''}
                 />
               )}
             </Stack>
@@ -732,32 +758,34 @@ export default function TemplatesPage() {
                 </Center>
               ) : (
                 <Stack>
-                  <Table>
-                    <Table.Thead>
-                      <Table.Tr>
-                        <Table.Th>Role Name</Table.Th>
-                        <Table.Th>Department</Table.Th>
-                        <Table.Th>Tasks Count</Table.Th>
-                      </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                      {paginatedRoles.map((templateRole) => (
-                        <Table.Tr key={templateRole.template_role_id}>
-                          <Table.Td>
-                            <Text fw={500}>{templateRole.role_name}</Text>
-                          </Table.Td>
-                          <Table.Td>
-                            <Text size="sm" c="dimmed">
-                              {templateRole.department_name || 'Unknown'}
-                            </Text>
-                          </Table.Td>
-                          <Table.Td>
-                            <Text size="sm">{templateRole.role_usage_count}</Text>
-                          </Table.Td>
+                  <div style={{ overflowX: 'auto', width: '100%' }}>
+                    <Table style={{ minWidth: '600px' }}>
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th style={{ minWidth: '200px' }}>Role Name</Table.Th>
+                          <Table.Th style={{ minWidth: '200px' }}>Department</Table.Th>
+                          <Table.Th style={{ minWidth: '150px' }}>Tasks Count</Table.Th>
                         </Table.Tr>
-                      ))}
-                    </Table.Tbody>
-                  </Table>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {paginatedRoles.map((templateRole) => (
+                          <Table.Tr key={templateRole.template_role_id}>
+                            <Table.Td>
+                              <Text fw={500}>{templateRole.role_name}</Text>
+                            </Table.Td>
+                            <Table.Td>
+                              <Text size="sm" c="dimmed">
+                                {templateRole.department_name || 'Unknown'}
+                              </Text>
+                            </Table.Td>
+                            <Table.Td>
+                              <Text size="sm">{templateRole.role_usage_count}</Text>
+                            </Table.Td>
+                          </Table.Tr>
+                        ))}
+                      </Table.Tbody>
+                    </Table>
+                  </div>
                   
                   {totalPages > 1 && (
                     <Group justify="center">
@@ -797,7 +825,7 @@ export default function TemplatesPage() {
             <Text c="dimmed">No tasks found in this phase</Text>
           </Center>
         ) : (
-          <DraggablePhaseTasksList
+          <DraggablePhaseStepTasksList
             tasks={phaseTasks}
             onReorder={handleReorderPhaseTasks}
             onEdit={handleEdit}
@@ -889,6 +917,7 @@ export default function TemplatesPage() {
           task={editingTask}
           parentTaskId={parentTaskId}
           phaseSteps={phaseSteps} // Available steps for selection
+          templatePhases={templatePhases} // Available phases for template-level task creation
           onSuccess={loadData}
           />
 

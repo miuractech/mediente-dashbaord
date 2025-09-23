@@ -49,7 +49,7 @@ export interface ProjectTemplate {
     task_name: string;
     description?: string;
     task_order: number;
-    estimated_hours?: number;
+    estimated_days?: number;
     assigned_role_id?: string;
     category?: TaskCategoryType;
     checklist_items?: ChecklistItem[];
@@ -106,7 +106,7 @@ export interface ProjectTemplate {
     task_name: string;
     description?: string;
     task_order?: number;
-    estimated_hours?: number;
+    estimated_days?: number;
     assigned_role_id?: string;
     parent_task_id?: string;
     category?: TaskCategoryType;
@@ -116,8 +116,9 @@ export interface ProjectTemplate {
   export interface UpdateStepTaskRequest {
     task_name?: string;
     description?: string;
+    step_id?: string; // Allow updating which step the task belongs to
     task_order?: number;
-    estimated_hours?: number;
+    estimated_days?: number;
     assigned_role_id?: string;
     parent_task_id?: string;
     category?: TaskCategoryType;

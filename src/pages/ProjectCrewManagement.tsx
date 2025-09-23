@@ -18,6 +18,10 @@ import {
   ActionIcon,
   TextInput,
   Select,
+  Table,
+  ScrollArea,
+  SegmentedControl,
+  Box,
 } from '@mantine/core';
 import {
   IconArrowLeft,
@@ -26,6 +30,8 @@ import {
   IconSearch,
   IconFilter,
   IconX,
+  IconLayoutGrid,
+  IconTable,
 } from '@tabler/icons-react';
 import { useProject, useProjectRoles, useProjectCrewAssignments } from '../projects/project.hook';
 import { RoleAssignmentModal } from '../projects/RoleAssignmentModal';
@@ -45,6 +51,7 @@ export default function ProjectCrewManagement() {
   const [assignmentModalOpened, setAssignmentModalOpened] = useState(false);
   const [selectedCrewMember, setSelectedCrewMember] = useState<ProjectCrewAssignmentWithDetails | null>(null);
   const [crewDetailModalOpened, setCrewDetailModalOpened] = useState(false);
+  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
 
   const { project, loading: projectLoading, error: projectError } = useProject(projectId || null);
   const { roles, loading: rolesLoading, refetch: refetchRoles } = useProjectRoles(projectId || null);
@@ -87,6 +94,10 @@ export default function ProjectCrewManagement() {
     
     return matchesSearch && matchesDepartment && matchesStatus;
   });
+
+  // Separate unassigned and assigned roles for card view
+  const unassignedRoles = filteredRoles.filter(role => !role.is_filled);
+  const assignedRoles = filteredRoles.filter(role => role.is_filled);
 
   // Pagination
   const totalPages = Math.ceil(filteredRoles.length / ROLES_PER_PAGE);
@@ -291,80 +302,250 @@ export default function ProjectCrewManagement() {
         </Group>
       </Card>
 
-      {/* Role Cards Grid */}
+      {/* View Toggle */}
+      <Card withBorder p="md">
+        <Group justify="space-between" align="center">
+          <Text fw={500}>View Options</Text>
+          <SegmentedControl
+            value={viewMode}
+            onChange={(value: string) => setViewMode(value as 'card' | 'table')}
+            data={[
+              {
+                label: (
+                  <Center style={{ gap: 10 }}>
+                    <IconLayoutGrid size={16} />
+                    <span>Cards</span>
+                  </Center>
+                ),
+                value: 'card',
+              },
+              {
+                label: (
+                  <Center style={{ gap: 10 }}>
+                    <IconTable size={16} />
+                    <span>Table</span>
+                  </Center>
+                ),
+                value: 'table',
+              },
+            ]}
+          />
+        </Group>
+      </Card>
+
+      {/* Roles Display */}
       {filteredRoles.length === 0 ? (
         <Card withBorder p="xl">
           <Text ta="center" c="dimmed">
             No roles found matching your filters.
           </Text>
         </Card>
+      ) : viewMode === 'card' ? (
+        /* Card View with Unassigned Roles at Top */
+        <Stack gap="md">
+          {/* Unassigned Roles Section */}
+          {unassignedRoles.length > 0 && (
+            <Card withBorder p="md">
+              <Text fw={600} mb="md" c="orange">
+                Unassigned Roles ({unassignedRoles.length})
+              </Text>
+              <ScrollArea>
+                <Box style={{ minWidth: '800px' }}>
+                  <SimpleGrid cols={{ base: 1, sm: 2, md: 3, lg: 4, xl: 5 }} spacing="md">
+                    {unassignedRoles.map((role) => (
+                      <Card
+                        key={role.project_role_id}
+                        withBorder
+                        p="md"
+                        style={{ cursor: 'pointer', minWidth: '200px' }}
+                        onClick={() => handleRoleClick(role)}
+                      >
+                        <Stack gap="sm">
+                          <Group justify="space-between" align="flex-start">
+                            <div style={{ flex: 1 }}>
+                              <Text fw={500} size="sm" lineClamp={2}>
+                                {role.role_name}
+                              </Text>
+                              <Text size="xs" c="dimmed" mt="xs">
+                                {role.department_name}
+                              </Text>
+                            </div>
+                            <Badge color="orange" variant="light" size="sm">
+                              Open
+                            </Badge>
+                          </Group>
+                          <Group gap="sm" c="dimmed">
+                            <IconUserPlus size={16} />
+                            <Text size="sm">Click to assign</Text>
+                          </Group>
+                        </Stack>
+                      </Card>
+                    ))}
+                  </SimpleGrid>
+                </Box>
+              </ScrollArea>
+            </Card>
+          )}
+
+          {/* Assigned Roles Section */}
+          {assignedRoles.length > 0 && (
+            <Card withBorder p="md">
+              <Text fw={600} mb="md" c="green">
+                Assigned Roles ({assignedRoles.length})
+              </Text>
+              <ScrollArea>
+                <Box style={{ minWidth: '800px' }}>
+                  <SimpleGrid cols={{ base: 1, sm: 2, md: 3, lg: 4, xl: 5 }} spacing="md">
+                    {assignedRoles.map((role) => {
+                      const assignment = getAssignmentForRole(role.project_role_id);
+                      
+                      return (
+                        <Card
+                          key={role.project_role_id}
+                          withBorder
+                          p="md"
+                          style={{ cursor: 'pointer', minWidth: '200px' }}
+                          onClick={() => handleRoleClick(role)}
+                        >
+                          <Stack gap="sm">
+                            <Group justify="space-between" align="flex-start">
+                              <div style={{ flex: 1 }}>
+                                <Text fw={500} size="sm" lineClamp={2}>
+                                  {role.role_name}
+                                </Text>
+                                <Text size="xs" c="dimmed" mt="xs">
+                                  {role.department_name}
+                                </Text>
+                              </div>
+                              <Badge color="green" variant="light" size="sm">
+                                Filled
+                              </Badge>
+                            </Group>
+
+                            {assignment && (
+                              <Group gap="sm">
+                                <Avatar
+                                  src={assignment.crew.photo_url}
+                                  size="sm"
+                                  radius="xl"
+                                >
+                                  <IconUser size={16} />
+                                </Avatar>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <Text size="sm" fw={500} lineClamp={1}>
+                                    {assignment.crew.name}
+                                  </Text>
+                                  <Text size="xs" c="dimmed" lineClamp={1}>
+                                    {assignment.crew.email}
+                                  </Text>
+                                </div>
+                              </Group>
+                            )}
+                          </Stack>
+                        </Card>
+                      );
+                    })}
+                  </SimpleGrid>
+                </Box>
+              </ScrollArea>
+            </Card>
+          )}
+        </Stack>
       ) : (
-        <>
-          <SimpleGrid cols={{ base: 1, sm: 2, md: 3, lg: 4 }} spacing="md">
-            {paginatedRoles.map((role) => {
-              const assignment = getAssignmentForRole(role.project_role_id);
-              
-              return (
-                <Card
-                  key={role.project_role_id}
-                  withBorder
-                  p="md"
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => handleRoleClick(role)}
-                >
-                  <Stack gap="sm">
-                    <Group justify="space-between" align="flex-start">
-                      <div style={{ flex: 1 }}>
-                        <Text fw={500} size="sm" lineClamp={2}>
+        /* Table View */
+        <Card withBorder p="md">
+          <ScrollArea>
+            <Table striped highlightOnHover>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>Role</Table.Th>
+                  <Table.Th>Department</Table.Th>
+                  <Table.Th>Status</Table.Th>
+                  <Table.Th>Assigned To</Table.Th>
+                  <Table.Th>Contact</Table.Th>
+                  <Table.Th>Actions</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {paginatedRoles.map((role) => {
+                  const assignment = getAssignmentForRole(role.project_role_id);
+                  
+                  return (
+                    <Table.Tr
+                      key={role.project_role_id}
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => handleRoleClick(role)}
+                    >
+                      <Table.Td>
+                        <Text fw={500} size="sm">
                           {role.role_name}
                         </Text>
-                        <Text size="xs" c="dimmed" mt="xs">
+                      </Table.Td>
+                      <Table.Td>
+                        <Text size="sm">
                           {role.department_name}
                         </Text>
-                      </div>
-                      
-                      <Badge
-                        color={assignment ? 'green' : 'orange'}
-                        variant="light"
-                        size="sm"
-                      >
-                        {assignment ? 'Filled' : 'Open'}
-                      </Badge>
-                    </Group>
-
-                    {assignment ? (
-                      <Group gap="sm">
-                        <Avatar
-                          src={assignment.crew.photo_url}
+                      </Table.Td>
+                      <Table.Td>
+                        <Badge
+                          color={assignment ? 'green' : 'orange'}
+                          variant="light"
                           size="sm"
-                          radius="xl"
                         >
-                          <IconUser size={16} />
-                        </Avatar>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <Text size="sm" fw={500} lineClamp={1}>
-                            {assignment.crew.name}
+                          {assignment ? 'Filled' : 'Open'}
+                        </Badge>
+                      </Table.Td>
+                      <Table.Td>
+                        {assignment ? (
+                          <Group gap="sm">
+                            <Avatar
+                              src={assignment.crew.photo_url}
+                              size="sm"
+                              radius="xl"
+                            >
+                              <IconUser size={16} />
+                            </Avatar>
+                            <Text size="sm" fw={500}>
+                              {assignment.crew.name}
+                            </Text>
+                          </Group>
+                        ) : (
+                          <Text size="sm" c="dimmed" fs="italic">
+                            Not assigned
                           </Text>
-                          <Text size="xs" c="dimmed" lineClamp={1}>
+                        )}
+                      </Table.Td>
+                      <Table.Td>
+                        {assignment ? (
+                          <Text size="sm" c="dimmed">
                             {assignment.crew.email}
                           </Text>
-                        </div>
-                      </Group>
-                    ) : (
-                      <Group gap="sm" c="dimmed">
-                        <IconUserPlus size={16} />
-                        <Text size="sm">
-                          Click to assign crew member
-                        </Text>
-                      </Group>
-                    )}
-                  </Stack>
-                </Card>
-              );
-            })}
-          </SimpleGrid>
+                        ) : (
+                          <Text size="sm" c="dimmed">
+                            -
+                          </Text>
+                        )}
+                      </Table.Td>
+                      <Table.Td>
+                        <ActionIcon
+                          variant="subtle"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRoleClick(role);
+                          }}
+                        >
+                          {assignment ? <IconUser size={16} /> : <IconUserPlus size={16} />}
+                        </ActionIcon>
+                      </Table.Td>
+                    </Table.Tr>
+                  );
+                })}
+              </Table.Tbody>
+            </Table>
+          </ScrollArea>
 
-          {/* Pagination */}
+          {/* Pagination for Table View */}
           {totalPages > 1 && (
             <Group justify="center" mt="md">
               <Pagination
@@ -375,7 +556,7 @@ export default function ProjectCrewManagement() {
               />
             </Group>
           )}
-        </>
+        </Card>
       )}
 
       {/* Role Assignment Modal */}

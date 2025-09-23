@@ -30,7 +30,7 @@ export interface Project {
 export interface ProjectWithStats extends Project {
   // Template-based totals (complete project scope)
   total_tasks: number;
-  total_estimated_hours: number;
+  total_estimated_days: number;
   
   // Current loaded task statistics (actual progress)
   loaded_tasks: number;
@@ -99,8 +99,8 @@ export interface ProjectTask {
   step_name: string;
   step_order: number;
   task_order: number;
-  estimated_hours: number | null;
-  actual_hours: number;
+  estimated_days: number | null;
+  actual_days: number;
   parent_task_id: string | null;
   task_status: TaskStatusType;
   category: TaskCategoryType | null;
@@ -174,7 +174,7 @@ export interface UpdateProjectInput {
 export interface CreateCustomTaskInput {
   task_name: string;
   task_description?: string;
-  estimated_hours?: number;
+  estimated_days?: number;
   category?: TaskCategoryType;
   parent_task_id?: string;
   checklist_items?: Array<{ id: string; text: string; order: number }>;
@@ -184,9 +184,10 @@ export interface UpdateTaskInput {
   task_name?: string;
   task_description?: string;
   task_status?: TaskStatusType;
-  estimated_hours?: number;
-  actual_hours?: number;
+  estimated_days?: number;
+  actual_days?: number;
   category?: TaskCategoryType;
+  parent_task_id?: string | null;
   checklist_items?: Array<{ id: string; text: string; order: number; completed?: boolean }>;
   escalation_reason?: string | null;
   escalated_at?: string | null;
@@ -269,7 +270,7 @@ export interface TemplateOption {
   phase_count: number;
   step_count: number;
   task_count: number;
-  total_estimated_hours: number;
+  total_estimated_days: number;
   roles_involved: number;
 }
 

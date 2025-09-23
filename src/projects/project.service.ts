@@ -606,7 +606,7 @@ class ProjectService {
         step_name: lastTask.step_name,
         step_order: lastTask.step_order,
         task_order: nextTaskOrder,
-        estimated_hours: input.estimated_hours,
+        estimated_days: input.estimated_days,
         parent_task_id: input.parent_task_id,
         category: input.category,
         checklist_items: input.checklist_items || [],
@@ -647,6 +647,15 @@ class ProjectService {
     });
 
     if (error) throw new Error(`Failed to load next phase tasks: ${error.message}`);
+    return data;
+  }
+
+  async loadAllProjectTasks(projectId: string): Promise<boolean> {
+    const { data, error } = await supabase.rpc('load_all_project_tasks', {
+      p_project_id: projectId,
+    });
+
+    if (error) throw new Error(`Failed to load all project tasks: ${error.message}`);
     return data;
   }
 
@@ -741,7 +750,7 @@ class ProjectService {
             step_id,
             step_tasks!inner(
               task_id,
-              estimated_hours
+              estimated_days
             )
           )
         )
@@ -770,10 +779,10 @@ class ProjectService {
           (stepAcc, step) => stepAcc + (step.step_tasks?.length || 0), 0
         ) || 0), 0
       ) || 0,
-      total_estimated_hours: template.template_phases?.reduce(
+      total_estimated_days: template.template_phases?.reduce(
         (acc, phase) => acc + (phase.phase_steps?.reduce(
           (stepAcc, step) => stepAcc + (step.step_tasks?.reduce(
-            (taskAcc, task) => taskAcc + (task.estimated_hours || 0), 0
+            (taskAcc, task) => taskAcc + (task.estimated_days || 0), 0
           ) || 0), 0
         ) || 0), 0
       ) || 0,
@@ -811,6 +820,49 @@ class ProjectService {
     return data || [];
   }
 
+  async getUnassignedCrew(projectId: string, searchTerm?: string, limit: number = 10): Promise<CrewMember[]> {
+    let query = supabase
+      .from('crew')
+      .select(`
+        id, 
+        name, 
+        email, 
+        phone, 
+        photo_url, 
+        status, 
+        is_archived
+      `)
+      .eq('status', true)
+      .eq('is_archived', false);
+
+    // Exclude crew members already assigned to this project
+    const assignedCrewQuery = supabase
+      .from('project_crew_assignments')
+      .select('crew_id')
+      .eq('project_id', projectId);
+
+    const { data: assignedCrew, error: assignedError } = await assignedCrewQuery;
+    if (assignedError) throw new Error(`Failed to fetch assigned crew: ${assignedError.message}`);
+
+    const assignedCrewIds = assignedCrew?.map(a => a.crew_id) || [];
+    
+    if (assignedCrewIds.length > 0) {
+      query = query.not('id', 'in', `(${assignedCrewIds.join(',')})`);
+    }
+
+    // Add search functionality if search term is provided
+    if (searchTerm && searchTerm.trim()) {
+      query = query.or(`name.ilike.%${searchTerm.trim()}%,email.ilike.%${searchTerm.trim()}%,phone.ilike.%${searchTerm.trim()}%`);
+    }
+
+    query = query.order('name', { ascending: true }).limit(limit);
+
+    const { data, error } = await query;
+
+    if (error) throw new Error(`Failed to fetch unassigned crew: ${error.message}`);
+    return data || [];
+  }
+
   async startProject(projectId: string): Promise<boolean> {
     // Check if project can start (all roles filled)
     const canStart = await this.canProjectStart(projectId);
@@ -818,10 +870,10 @@ class ProjectService {
       throw new Error('Cannot start project: not all roles are filled');
     }
 
-    // Load first step tasks
-    const loaded = await this.loadNextPhaseTasks(projectId);
+    // Load all tasks from all phases
+    const loaded = await this.loadAllProjectTasks(projectId);
     if (!loaded) {
-      throw new Error('Failed to load initial tasks');
+      throw new Error('Failed to load all project tasks');
     }
 
     // Update project status to active

@@ -82,7 +82,7 @@ export function TaskDrawer({ taskId, opened, onClose, onTaskUpdate }: TaskDrawer
   const [editData, setEditData] = useState({
     task_name: '',
     task_description: '',
-    estimated_hours: 0,
+    estimated_days: 0,
   });
   const [deleteConfirmOpened, setDeleteConfirmOpened] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<{ id: string; file_url: string; file_name: string } | null>(null);
@@ -97,7 +97,7 @@ export function TaskDrawer({ taskId, opened, onClose, onTaskUpdate }: TaskDrawer
       setEditData({
         task_name: task.task_name,
         task_description: task.task_description || '',
-        estimated_hours: task.estimated_hours || 0,
+        estimated_days: task.estimated_days || 0,
       });
     }
   }, [task]);
@@ -186,7 +186,7 @@ export function TaskDrawer({ taskId, opened, onClose, onTaskUpdate }: TaskDrawer
       setEditData({
         task_name: task.task_name,
         task_description: task.task_description || '',
-        estimated_hours: task.estimated_hours || 0,
+        estimated_days: task.estimated_days || 0,
       });
     }
     setEditMode(!editMode);
@@ -196,7 +196,7 @@ export function TaskDrawer({ taskId, opened, onClose, onTaskUpdate }: TaskDrawer
     const success = await updateTask(task.project_task_id, {
       task_name: editData.task_name,
       task_description: editData.task_description || undefined,
-      estimated_hours: editData.estimated_hours || undefined,
+      estimated_days: editData.estimated_days || undefined,
     });
     
     if (success) {
@@ -366,9 +366,9 @@ export function TaskDrawer({ taskId, opened, onClose, onTaskUpdate }: TaskDrawer
                 leftSection={<IconMessage size={18} />}
               />
               <NumberInput
-                label="Estimated Hours"
-                value={editData.estimated_hours}
-                onChange={(value) => setEditData(prev => ({ ...prev, estimated_hours: Number(value) || 0 }))}
+                label="Estimated Days"
+                value={editData.estimated_days}
+                onChange={(value) => setEditData(prev => ({ ...prev, estimated_days: Number(value) || 0 }))}
                 min={0}
                 step={0.5}
                 decimalScale={1}
@@ -533,21 +533,21 @@ export function TaskDrawer({ taskId, opened, onClose, onTaskUpdate }: TaskDrawer
                 Step {task.step_order}: {task.step_name}
               </Badge>
             </Group>
-            {task.estimated_hours && (
+            {task.estimated_days && (
               <Group justify="space-between" align="center">
                 <Group gap="sm">
                   <IconClock size={18} color="var(--mantine-color-orange-6)" />
-                  <Text size="md" c="dimmed">Estimated Hours</Text>
+                  <Text size="md" c="dimmed">Estimated Days</Text>
                 </Group>
-                <Text size="md" fw={500}>{task.estimated_hours}h</Text>
+                <Text size="md" fw={500}>{task.estimated_days}d</Text>
               </Group>
             )}
             <Group justify="space-between" align="center">
               <Group gap="sm">
                 <IconHourglass size={18} color="var(--mantine-color-teal-6)" />
-                <Text size="md" c="dimmed">Actual Hours</Text>
+                <Text size="md" c="dimmed">Actual Days</Text>
               </Group>
-              <Text size="md" fw={500}>{task.actual_hours}h</Text>
+              <Text size="md" fw={500}>{task.actual_days}d</Text>
             </Group>
             {task.deadline && (
               <Group justify="space-between" align="center">

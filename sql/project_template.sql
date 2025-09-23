@@ -30,6 +30,68 @@ BEGIN
 END $$;
 
 -- =====================================================
+-- 1a. LEGACY SAFEGUARD: Ensure step_tasks.template_id exists early
+-- =====================================================
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_name = 'step_tasks'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'step_tasks' AND column_name = 'template_id'
+    ) THEN
+        ALTER TABLE step_tasks ADD COLUMN template_id UUID;
+
+        UPDATE step_tasks st
+        SET template_id = ph.template_id
+        FROM phase_steps ps
+        INNER JOIN template_phases ph ON ps.phase_id = ph.phase_id
+        WHERE st.step_id = ps.step_id AND st.template_id IS NULL;
+
+        -- Drop legacy per-step unique constraint to avoid conflicts during renumber
+        BEGIN
+            ALTER TABLE step_tasks DROP CONSTRAINT IF EXISTS step_tasks_step_id_task_order_key;
+        EXCEPTION WHEN others THEN
+            NULL;
+        END;
+
+        -- Two-phase renumber to avoid unique violations
+        CREATE TEMP TABLE tmp_task_order_map AS
+        SELECT st.task_id,
+               ROW_NUMBER() OVER (
+                 PARTITION BY st.template_id 
+                 ORDER BY st.task_order, st.created_at, st.task_id
+               ) AS new_order
+        FROM step_tasks st
+        WHERE st.template_id IS NOT NULL;
+
+        -- Phase 1: offset orders to safe range
+        UPDATE step_tasks st
+        SET task_order = m.new_order + 100000
+        FROM tmp_task_order_map m
+        WHERE st.task_id = m.task_id;
+
+        -- Phase 2: normalize to final order
+        UPDATE step_tasks st
+        SET task_order = m.new_order
+        FROM tmp_task_order_map m
+        WHERE st.task_id = m.task_id;
+
+        DROP TABLE IF EXISTS tmp_task_order_map;
+
+        -- indexes and constraints (best-effort)
+        BEGIN
+            CREATE INDEX IF NOT EXISTS idx_step_tasks_template_id ON step_tasks(template_id);
+            CREATE INDEX IF NOT EXISTS idx_step_tasks_template_archived ON step_tasks(template_id, is_archived);
+            CREATE UNIQUE INDEX IF NOT EXISTS uniq_step_tasks_template_order ON step_tasks(template_id, task_order);
+        EXCEPTION WHEN others THEN
+            NULL;
+        END;
+    END IF;
+END $$;
+
+-- =====================================================
 -- 2. PROJECT TEMPLATES TABLE (Level 1)
 -- =====================================================
 
@@ -134,10 +196,11 @@ CREATE TRIGGER update_phase_steps_updated_at
 CREATE TABLE IF NOT EXISTS step_tasks (
   task_id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   step_id UUID NOT NULL REFERENCES phase_steps(step_id) ON DELETE CASCADE,
+  template_id UUID NOT NULL REFERENCES project_templates(template_id) ON DELETE CASCADE,
   task_name VARCHAR(200) NOT NULL,
   description TEXT CHECK (char_length(description) <= 1000),
   task_order INTEGER NOT NULL DEFAULT 1,
-  estimated_hours INTEGER CHECK (estimated_hours >= 0),
+  estimated_days INTEGER CHECK (estimated_days >= 0),
   assigned_role_id UUID,
   parent_task_id UUID REFERENCES step_tasks(task_id) ON DELETE CASCADE,
   category task_category_type,
@@ -147,10 +210,54 @@ CREATE TABLE IF NOT EXISTS step_tasks (
   updated_by VARCHAR(255),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
-  UNIQUE(step_id, task_order),
+  UNIQUE(template_id, task_order),
   -- Constraint to ensure checklist_items is a valid JSON array
   CONSTRAINT step_tasks_checklist_items_is_array CHECK (jsonb_typeof(checklist_items) = 'array')
 );
+
+-- Migration: Handle existing databases with estimated_hours column
+DO $$
+BEGIN
+    -- Check if we have the old estimated_hours column but not estimated_days
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'step_tasks' AND column_name = 'estimated_hours'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'step_tasks' AND column_name = 'estimated_days'
+    ) THEN
+        -- Add the new column
+        ALTER TABLE step_tasks ADD COLUMN estimated_days INTEGER CHECK (estimated_days >= 0);
+        
+        -- Copy data from old column to new column
+        UPDATE step_tasks SET estimated_days = estimated_hours WHERE estimated_hours IS NOT NULL;
+        
+        -- Drop the old column
+        ALTER TABLE step_tasks DROP COLUMN estimated_hours;
+        
+        RAISE NOTICE 'Migrated estimated_hours to estimated_days column';
+    ELSIF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'step_tasks' AND column_name = 'estimated_days'
+    ) THEN
+        -- Add estimated_days column if it doesn't exist
+        ALTER TABLE step_tasks ADD COLUMN estimated_days INTEGER CHECK (estimated_days >= 0);
+        RAISE NOTICE 'Added estimated_days column';
+    ELSE
+        RAISE NOTICE 'estimated_days column already exists';
+    END IF;
+END $$;
+
+-- Ensure template_id column exists for legacy databases before creating indexes
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'step_tasks' AND column_name = 'template_id'
+    ) THEN
+        ALTER TABLE step_tasks ADD COLUMN template_id UUID;
+    END IF;
+END $$;
 
 -- Add foreign key constraint for assigned_role_id if department_roles table exists
 DO $$
@@ -181,7 +288,9 @@ CREATE INDEX IF NOT EXISTS idx_step_tasks_step_id ON step_tasks(step_id);
 CREATE INDEX IF NOT EXISTS idx_step_tasks_order ON step_tasks(task_order);
 CREATE INDEX IF NOT EXISTS idx_step_tasks_archived ON step_tasks(is_archived);
 CREATE INDEX IF NOT EXISTS idx_step_tasks_name ON step_tasks(task_name);
-CREATE INDEX IF NOT EXISTS idx_step_tasks_estimated_hours ON step_tasks(estimated_hours);
+-- Drop old estimated_hours index if it exists and create new estimated_days index
+DROP INDEX IF EXISTS idx_step_tasks_estimated_hours;
+CREATE INDEX IF NOT EXISTS idx_step_tasks_estimated_days ON step_tasks(estimated_days);
 CREATE INDEX IF NOT EXISTS idx_step_tasks_assigned_role ON step_tasks(assigned_role_id);
 CREATE INDEX IF NOT EXISTS idx_step_tasks_parent_task_id ON step_tasks(parent_task_id);
 CREATE INDEX IF NOT EXISTS idx_step_tasks_category ON step_tasks(category);
@@ -189,6 +298,8 @@ CREATE INDEX IF NOT EXISTS idx_step_tasks_step_archived ON step_tasks(step_id, i
 CREATE INDEX IF NOT EXISTS idx_step_tasks_role_archived ON step_tasks(assigned_role_id, is_archived) WHERE assigned_role_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_step_tasks_step_parent ON step_tasks(step_id, parent_task_id);
 CREATE INDEX IF NOT EXISTS idx_step_tasks_step_category ON step_tasks(step_id, category);
+CREATE INDEX IF NOT EXISTS idx_step_tasks_template_id ON step_tasks(template_id);
+CREATE INDEX IF NOT EXISTS idx_step_tasks_template_archived ON step_tasks(template_id, is_archived);
 -- Full-text search index for tasks
 CREATE INDEX IF NOT EXISTS idx_step_tasks_search ON step_tasks USING gin(to_tsvector('english', task_name || ' ' || COALESCE(description, '')));
 -- GIN index for JSONB operations on checklist_items
@@ -200,6 +311,147 @@ CREATE TRIGGER update_step_tasks_updated_at
     BEFORE UPDATE ON step_tasks 
     FOR EACH ROW 
     EXECUTE FUNCTION update_updated_at_column();
+
+-- Backfill and enforce template_id and global ordering for existing databases
+DO $$
+BEGIN
+    -- Add template_id column if missing
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'step_tasks' AND column_name = 'template_id'
+    ) THEN
+        ALTER TABLE step_tasks ADD COLUMN template_id UUID;
+    END IF;
+
+    -- Populate template_id from step -> phase -> template
+    UPDATE step_tasks st
+    SET template_id = ph.template_id
+    FROM phase_steps ps
+    INNER JOIN template_phases ph ON ps.phase_id = ph.phase_id
+    WHERE st.step_id = ps.step_id AND st.template_id IS NULL;
+
+    -- Drop legacy per-step unique constraint to avoid conflicts during renumber
+    BEGIN
+        ALTER TABLE step_tasks DROP CONSTRAINT IF EXISTS step_tasks_step_id_task_order_key;
+    EXCEPTION WHEN others THEN
+        NULL;
+    END;
+
+    -- Ensure global unique ordering per template by two-phase re-numbering
+    CREATE TEMP TABLE tmp_task_order_map AS
+    SELECT 
+        st.task_id,
+        ROW_NUMBER() OVER (
+            PARTITION BY st.template_id 
+            ORDER BY st.task_order, st.created_at, st.task_id
+        ) AS new_order
+    FROM step_tasks st
+    WHERE st.template_id IS NOT NULL;
+
+    -- Phase 1: offset orders to avoid unique collisions
+    UPDATE step_tasks st
+    SET task_order = m.new_order + 100000
+    FROM tmp_task_order_map m
+    WHERE st.task_id = m.task_id;
+
+    -- Phase 2: normalize back to final order
+    UPDATE step_tasks st
+    SET task_order = m.new_order
+    FROM tmp_task_order_map m
+    WHERE st.task_id = m.task_id;
+
+    DROP TABLE IF EXISTS tmp_task_order_map;
+
+    -- Set NOT NULL if all rows populated
+    IF NOT EXISTS (SELECT 1 FROM step_tasks WHERE template_id IS NULL) THEN
+        BEGIN
+            ALTER TABLE step_tasks ALTER COLUMN template_id SET NOT NULL;
+        EXCEPTION WHEN others THEN
+            NULL;
+        END;
+    END IF;
+
+    -- Add FK if missing
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.table_constraints tc
+        JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name
+        WHERE tc.table_name = 'step_tasks' 
+        AND tc.constraint_type = 'FOREIGN KEY'
+        AND kcu.column_name = 'template_id'
+    ) THEN
+        BEGIN
+            ALTER TABLE step_tasks
+            ADD CONSTRAINT fk_step_tasks_template
+            FOREIGN KEY (template_id) REFERENCES project_templates(template_id) ON DELETE CASCADE;
+        EXCEPTION WHEN others THEN
+            NULL;
+        END;
+    END IF;
+
+    -- Create helpful indexes
+    BEGIN
+        CREATE INDEX IF NOT EXISTS idx_step_tasks_template_id ON step_tasks(template_id);
+        CREATE INDEX IF NOT EXISTS idx_step_tasks_template_archived ON step_tasks(template_id, is_archived);
+        CREATE UNIQUE INDEX IF NOT EXISTS uniq_step_tasks_template_order ON step_tasks(template_id, task_order);
+    EXCEPTION WHEN others THEN
+        NULL;
+    END;
+END $$;
+
+-- Compatibility column: expose global_task_order as a generated alias of task_order
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'step_tasks' AND column_name = 'global_task_order'
+  ) THEN
+    ALTER TABLE step_tasks ADD COLUMN global_task_order INTEGER GENERATED ALWAYS AS (task_order) STORED;
+  END IF;
+END $$;
+
+-- Trigger to set template_id and auto-assign global task_order per template
+CREATE OR REPLACE FUNCTION set_step_tasks_template_and_order()
+RETURNS TRIGGER AS $$
+DECLARE
+    resolved_template_id UUID;
+    next_order INTEGER;
+    is_update BOOLEAN := TG_OP = 'UPDATE';
+BEGIN
+    -- Resolve template_id from step_id when missing or when step_id changed (on UPDATE)
+    IF NEW.template_id IS NULL THEN
+        SELECT tp.template_id INTO resolved_template_id
+        FROM phase_steps ps
+        INNER JOIN template_phases ph ON ps.phase_id = ph.phase_id
+        INNER JOIN project_templates tp ON ph.template_id = tp.template_id
+        WHERE ps.step_id = NEW.step_id;
+        NEW.template_id := resolved_template_id;
+    ELSIF is_update AND (NEW.step_id IS DISTINCT FROM OLD.step_id) THEN
+        SELECT tp.template_id INTO resolved_template_id
+        FROM phase_steps ps
+        INNER JOIN template_phases ph ON ps.phase_id = ph.phase_id
+        INNER JOIN project_templates tp ON ph.template_id = tp.template_id
+        WHERE ps.step_id = NEW.step_id;
+        NEW.template_id := resolved_template_id;
+    END IF;
+
+    -- Auto-assign next task_order globally within template if null
+    IF NEW.task_order IS NULL THEN
+        SELECT COALESCE(MAX(task_order), 0) + 1 INTO next_order
+        FROM step_tasks
+        WHERE template_id = NEW.template_id;
+        NEW.task_order := next_order;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS set_step_tasks_template_and_order_trigger ON step_tasks;
+CREATE TRIGGER set_step_tasks_template_and_order_trigger
+    BEFORE INSERT OR UPDATE OF step_id, task_order ON step_tasks
+    FOR EACH ROW
+    EXECUTE FUNCTION set_step_tasks_template_and_order();
 
 -- =====================================================
 -- 6. CHECKLIST VALIDATION FUNCTIONS
@@ -403,6 +655,9 @@ $$ LANGUAGE sql;
 -- 8. TEMPLATE UTILITY FUNCTIONS
 -- =====================================================
 
+-- Drop existing function if it exists (needed for return type change)
+DROP FUNCTION IF EXISTS get_template_hierarchy(UUID);
+
 -- Function to get template hierarchy with counts and role assignments
 CREATE OR REPLACE FUNCTION get_template_hierarchy(template_uuid UUID)
 RETURNS TABLE (
@@ -411,7 +666,7 @@ RETURNS TABLE (
     phase_count BIGINT,
     step_count BIGINT,
     task_count BIGINT,
-    total_estimated_hours BIGINT,
+    total_estimated_days BIGINT,
     roles_involved BIGINT
 ) AS $$
 BEGIN
@@ -422,7 +677,7 @@ BEGIN
         COALESCE(phase_counts.phase_count, 0) as phase_count,
         COALESCE(step_counts.step_count, 0) as step_count,
         COALESCE(task_counts.task_count, 0) as task_count,
-        COALESCE(task_hours.total_hours, 0) as total_estimated_hours,
+        COALESCE(task_days.total_days, 0) as total_estimated_days,
         COALESCE(role_counts.roles_involved, 0) as roles_involved
     FROM project_templates pt
     LEFT JOIN (
@@ -447,13 +702,13 @@ BEGIN
         GROUP BY tp.template_id
     ) task_counts ON pt.template_id = task_counts.template_id
     LEFT JOIN (
-        SELECT tp.template_id, SUM(st.estimated_hours) as total_hours
+        SELECT tp.template_id, SUM(st.estimated_days) as total_days
         FROM template_phases tp
         LEFT JOIN phase_steps ps ON tp.phase_id = ps.phase_id AND ps.is_archived = false
         LEFT JOIN step_tasks st ON ps.step_id = st.step_id AND st.is_archived = false
-        WHERE tp.is_archived = false AND st.estimated_hours IS NOT NULL
+        WHERE tp.is_archived = false AND st.estimated_days IS NOT NULL
         GROUP BY tp.template_id
-    ) task_hours ON pt.template_id = task_hours.template_id
+    ) task_days ON pt.template_id = task_days.template_id
     LEFT JOIN (
         SELECT tp.template_id, COUNT(DISTINCT st.assigned_role_id) as roles_involved
         FROM template_phases tp
@@ -466,108 +721,187 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Drop existing function first to allow parameter name changes
+DROP FUNCTION IF EXISTS duplicate_template(UUID, VARCHAR, VARCHAR);
+
 -- Function to duplicate a template with all its children
 CREATE OR REPLACE FUNCTION duplicate_template(
-    source_template_id UUID,
-    new_template_name VARCHAR,
-    created_by_user VARCHAR
+    p_source_template_id UUID,
+    p_new_template_name VARCHAR,
+    p_created_by_user VARCHAR
 )
 RETURNS UUID AS $$
 DECLARE
-    new_template_id UUID;
+    v_new_template_id UUID;
     phase_record RECORD;
     step_record RECORD;
     task_record RECORD;
-    new_phase_id UUID;
-    new_step_id UUID;
+    v_new_phase_id UUID;
+    v_new_step_id UUID;
+    v_next_task_order INTEGER := 1;
 BEGIN
     -- Create new template
     INSERT INTO project_templates (template_name, description, created_by)
-    SELECT new_template_name, description, created_by_user
-    FROM project_templates
-    WHERE template_id = source_template_id
-    RETURNING template_id INTO new_template_id;
+    SELECT p_new_template_name, pt.description, p_created_by_user
+    FROM project_templates pt
+    WHERE pt.template_id = p_source_template_id
+    RETURNING project_templates.template_id INTO v_new_template_id;
+
+    -- Initialize next task order for the new template (starts from 1 since it's a new template)
+    v_next_task_order := 1;
 
     -- Copy phases
     FOR phase_record IN
-        SELECT * FROM template_phases
-        WHERE template_id = source_template_id AND is_archived = false
-        ORDER BY phase_order
+        SELECT * FROM template_phases tp
+        WHERE tp.template_id = p_source_template_id AND tp.is_archived = false
+        ORDER BY tp.phase_order
     LOOP
         INSERT INTO template_phases (template_id, phase_name, description, phase_order, created_by)
-        VALUES (new_template_id, phase_record.phase_name, phase_record.description, phase_record.phase_order, created_by_user)
-        RETURNING phase_id INTO new_phase_id;
+        VALUES (v_new_template_id, phase_record.phase_name, phase_record.description, phase_record.phase_order, p_created_by_user)
+        RETURNING template_phases.phase_id INTO v_new_phase_id;
 
         -- Copy steps for this phase
         FOR step_record IN
-            SELECT * FROM phase_steps
-            WHERE phase_id = phase_record.phase_id AND is_archived = false
-            ORDER BY step_order
+            SELECT * FROM phase_steps ps
+            WHERE ps.phase_id = phase_record.phase_id AND ps.is_archived = false
+            ORDER BY ps.step_order
         LOOP
             INSERT INTO phase_steps (phase_id, step_name, description, step_order, created_by)
-            VALUES (new_phase_id, step_record.step_name, step_record.description, step_record.step_order, created_by_user)
-            RETURNING step_id INTO new_step_id;
+            VALUES (v_new_phase_id, step_record.step_name, step_record.description, step_record.step_order, p_created_by_user)
+            RETURNING phase_steps.step_id INTO v_new_step_id;
 
             -- Copy tasks for this step (with role assignments and all new fields)
             FOR task_record IN
-                SELECT * FROM step_tasks
-                WHERE step_id = step_record.step_id AND is_archived = false
-                ORDER BY task_order
+                SELECT * FROM step_tasks st
+                WHERE st.step_id = step_record.step_id AND st.is_archived = false
+                ORDER BY st.task_order
             LOOP
                 INSERT INTO step_tasks (
-                    step_id, task_name, description, task_order, estimated_hours, 
+                    step_id, template_id, task_name, description, task_order, estimated_days, 
                     assigned_role_id, category, checklist_items, created_by
                 )
                 VALUES (
-                    new_step_id, task_record.task_name, task_record.description, 
-                    task_record.task_order, task_record.estimated_hours, 
+                    v_new_step_id, v_new_template_id, task_record.task_name, task_record.description, 
+                    v_next_task_order, task_record.estimated_days, 
                     task_record.assigned_role_id, task_record.category, 
-                    task_record.checklist_items, created_by_user
+                    task_record.checklist_items, p_created_by_user
                 );
+                v_next_task_order := v_next_task_order + 1;
             END LOOP;
         END LOOP;
     END LOOP;
 
-    RETURN new_template_id;
+    RETURN v_new_template_id;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Drop old function if it exists with JSON parameter
+DROP FUNCTION IF EXISTS reorder_template_items(UUID, VARCHAR, JSON);
 
 -- Function to reorder items within a parent
 CREATE OR REPLACE FUNCTION reorder_template_items(
     parent_id UUID,
     item_type VARCHAR,
-    item_orders JSON
+    item_orders JSONB
 )
 RETURNS BOOLEAN AS $$
 DECLARE
     item RECORD;
+    max_safe_order INTEGER := 999999;
+    temp_table_name TEXT;
 BEGIN
-    -- Loop through the JSON array of item orders
-    FOR item IN SELECT * FROM json_array_elements(item_orders)
-    LOOP
-        CASE item_type
-            WHEN 'phases' THEN
-                UPDATE template_phases
-                SET phase_order = (item.value->>'order')::INTEGER,
-                    updated_at = NOW()
-                WHERE phase_id = (item.value->>'id')::UUID
-                AND template_id = parent_id;
-                
-            WHEN 'steps' THEN
-                UPDATE phase_steps
-                SET step_order = (item.value->>'order')::INTEGER,
-                    updated_at = NOW()
-                WHERE step_id = (item.value->>'id')::UUID
-                AND phase_id = parent_id;
-                
-            WHEN 'tasks' THEN
-                UPDATE step_tasks
-                SET task_order = (item.value->>'order')::INTEGER,
-                    updated_at = NOW()
-                WHERE task_id = (item.value->>'id')::UUID
-                AND step_id = parent_id;
-        END CASE;
-    END LOOP;
+    -- Create a temporary mapping table to avoid unique constraint issues
+    CREATE TEMP TABLE IF NOT EXISTS temp_reorder_map (
+        item_id UUID,
+        old_order INTEGER,
+        new_order INTEGER,
+        temp_order INTEGER
+    ) ON COMMIT DROP;
+    
+    -- Clear any previous data
+    DELETE FROM temp_reorder_map WHERE TRUE;
+
+    IF item_type = 'tasks' THEN
+        -- Check if parent_id is a template_id or step_id
+        DECLARE
+            is_template_level BOOLEAN;
+        BEGIN
+            -- Check if parent_id exists in project_templates
+            SELECT EXISTS(SELECT 1 FROM project_templates WHERE template_id = parent_id) INTO is_template_level;
+            
+            -- Populate mapping table with current data
+            FOR item IN SELECT * FROM jsonb_array_elements(item_orders) LOOP
+                INSERT INTO temp_reorder_map (item_id, new_order)
+                VALUES (
+                    (item.value->>'id')::UUID,
+                    (item.value->>'order')::INTEGER
+                );
+            END LOOP;
+
+            -- Generate safe temporary orders using a separate query
+            WITH numbered_rows AS (
+                SELECT item_id, max_safe_order + row_number() OVER (ORDER BY item_id) AS temp_order_val
+                FROM temp_reorder_map
+            )
+            UPDATE temp_reorder_map 
+            SET temp_order = numbered_rows.temp_order_val
+            FROM numbered_rows
+            WHERE temp_reorder_map.item_id = numbered_rows.item_id;
+
+            -- Step 1: Set temporary orders to avoid conflicts
+            FOR item IN SELECT item_id, temp_order FROM temp_reorder_map LOOP
+                IF is_template_level THEN
+                    UPDATE step_tasks
+                    SET task_order = item.temp_order,
+                        updated_at = NOW()
+                    WHERE task_id = item.item_id
+                    AND template_id = parent_id;
+                ELSE
+                    UPDATE step_tasks
+                    SET task_order = item.temp_order,
+                        updated_at = NOW()
+                    WHERE task_id = item.item_id
+                    AND step_id = parent_id;
+                END IF;
+            END LOOP;
+
+            -- Step 2: Set final orders
+            FOR item IN SELECT item_id, new_order FROM temp_reorder_map LOOP
+                IF is_template_level THEN
+                    UPDATE step_tasks
+                    SET task_order = item.new_order,
+                        updated_at = NOW()
+                    WHERE task_id = item.item_id
+                    AND template_id = parent_id;
+                ELSE
+                    UPDATE step_tasks
+                    SET task_order = item.new_order,
+                        updated_at = NOW()
+                    WHERE task_id = item.item_id
+                    AND step_id = parent_id;
+                END IF;
+            END LOOP;
+        END;
+    ELSE
+        -- Handle phases and steps with safer approach
+        FOR item IN SELECT * FROM jsonb_array_elements(item_orders) LOOP
+            CASE item_type
+                WHEN 'phases' THEN
+                    UPDATE template_phases
+                    SET phase_order = (item.value->>'order')::INTEGER,
+                        updated_at = NOW()
+                    WHERE phase_id = (item.value->>'id')::UUID
+                    AND template_id = parent_id;
+                    
+                WHEN 'steps' THEN
+                    UPDATE phase_steps
+                    SET step_order = (item.value->>'order')::INTEGER,
+                        updated_at = NOW()
+                    WHERE step_id = (item.value->>'id')::UUID
+                    AND phase_id = parent_id;
+            END CASE;
+        END LOOP;
+    END IF;
     
     RETURN TRUE;
 END;
@@ -676,7 +1010,7 @@ COMMENT ON FUNCTION get_task_descendants(UUID) IS 'Get all descendants (children
 COMMENT ON FUNCTION get_task_ancestors(UUID) IS 'Get all ancestors (parents, grandparents, etc.) of a given task';
 COMMENT ON FUNCTION get_template_hierarchy(UUID) IS 'Get comprehensive statistics for a template including counts and role assignments';
 COMMENT ON FUNCTION duplicate_template(UUID, VARCHAR, VARCHAR) IS 'Duplicate a template with all its phases, steps, and tasks';
-COMMENT ON FUNCTION reorder_template_items(UUID, VARCHAR, JSON) IS 'Reorder phases, steps, or tasks within their parent container';
+COMMENT ON FUNCTION reorder_template_items(UUID, VARCHAR, JSONB) IS 'Reorder phases, steps, or tasks within their parent container';
 
 -- =====================================================
 -- 11. COPY/CLONE FUNCTIONS FOR TASKS AND STEPS
@@ -696,7 +1030,21 @@ DECLARE
     new_task_id UUID;
     mapped_parent_id UUID;
     copied_count INTEGER := 0;
+    target_template_id UUID;
+    next_task_order INTEGER := 1;
 BEGIN
+    -- Resolve target template
+    SELECT tp.template_id INTO target_template_id
+    FROM phase_steps ps
+    INNER JOIN template_phases ph ON ps.phase_id = ph.phase_id
+    INNER JOIN project_templates tp ON ph.template_id = tp.template_id
+    WHERE ps.step_id = target_step_id;
+
+    -- Initialize next order
+    SELECT COALESCE(MAX(task_order), 0) + 1 INTO next_task_order
+    FROM step_tasks
+    WHERE template_id = target_template_id;
+
     -- First pass: Copy all tasks and build ID mapping
     FOR task_record IN
         SELECT * FROM step_tasks
@@ -715,16 +1063,17 @@ BEGIN
         
         -- Insert new task (without parent_task_id for now)
         INSERT INTO step_tasks (
-            task_id, step_id, task_name, description, task_order,
-            estimated_hours, assigned_role_id, category, checklist_items,
+            task_id, step_id, template_id, task_name, description, task_order,
+            estimated_days, assigned_role_id, category, checklist_items,
             created_by, parent_task_id
         ) VALUES (
-            new_task_id, target_step_id, task_record.task_name || ' (' || name_suffix || ')',
-            task_record.description, task_record.task_order,
-            task_record.estimated_hours, task_record.assigned_role_id,
+            new_task_id, target_step_id, target_template_id, task_record.task_name || ' (' || name_suffix || ')',
+            task_record.description, next_task_order,
+            task_record.estimated_days, task_record.assigned_role_id,
             task_record.category, task_record.checklist_items,
             created_by_user, NULL -- Will be updated in second pass
         );
+        next_task_order := next_task_order + 1;
         
         copied_count := copied_count + 1;
     END LOOP;
@@ -864,19 +1213,67 @@ BEGIN
         GROUP BY tp.template_id
     ) parent_task_counts ON pt.template_id = parent_task_counts.template_id
     LEFT JOIN (
-        SELECT tp.template_id, SUM(st.estimated_hours * 3600) as total_seconds
+        SELECT tp.template_id, SUM(st.estimated_days * 86400) as total_seconds
         FROM template_phases tp
         LEFT JOIN phase_steps ps ON tp.phase_id = ps.phase_id AND ps.is_archived = false
         LEFT JOIN step_tasks st ON ps.step_id = st.step_id AND st.is_archived = false
-        WHERE tp.is_archived = false AND st.estimated_hours IS NOT NULL
+        WHERE tp.is_archived = false AND st.estimated_days IS NOT NULL
         GROUP BY tp.template_id
-    ) task_hours ON pt.template_id = task_hours.template_id
+    ) task_days ON pt.template_id = task_days.template_id
     WHERE pt.template_id = template_uuid AND pt.is_archived = false;
 END;
 $$ LANGUAGE plpgsql;
 
 -- =====================================================
--- 12. VERIFICATION AND SUCCESS MESSAGE
+-- 12. CLEANUP FUNCTION FOR NEGATIVE TASK ORDERS
+-- =====================================================
+
+-- Function to fix any negative task orders in the database
+CREATE OR REPLACE FUNCTION fix_negative_task_orders()
+RETURNS INTEGER AS $$
+DECLARE
+    template_record RECORD;
+    task_record RECORD;
+    fixed_count INTEGER := 0;
+    new_order INTEGER;
+BEGIN
+    -- Loop through each template to fix negative orders
+    FOR template_record IN 
+        SELECT DISTINCT template_id 
+        FROM step_tasks 
+        WHERE task_order < 0
+    LOOP
+        new_order := 1;
+        
+        -- Get all tasks for this template ordered by current order (ignoring negatives)
+        -- and reassign positive sequential orders
+        FOR task_record IN
+            SELECT task_id, task_order
+            FROM step_tasks
+            WHERE template_id = template_record.template_id
+            ORDER BY 
+                CASE WHEN task_order < 0 THEN 999999 + task_order ELSE task_order END,
+                created_at,
+                task_id
+        LOOP
+            UPDATE step_tasks
+            SET task_order = new_order
+            WHERE task_id = task_record.task_id;
+            
+            new_order := new_order + 1;
+            fixed_count := fixed_count + 1;
+        END LOOP;
+    END LOOP;
+    
+    RETURN fixed_count;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Run the cleanup function
+SELECT fix_negative_task_orders() as "Fixed negative task orders count";
+
+-- =====================================================
+-- 13. VERIFICATION AND SUCCESS MESSAGE
 -- =====================================================
 
 DO $$

@@ -17,8 +17,8 @@ import {
 } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
-import type { StepTask, PhaseStep, CreateStepTaskRequest, UpdateStepTaskRequest, TaskCategoryType, ChecklistItem, CreatePhaseStepRequest } from './template.type';
-import { stepTaskService, phaseStepService } from './projectTemplateService';
+import type { StepTask, PhaseStep, TemplatePhase, CreateStepTaskRequest, UpdateStepTaskRequest, TaskCategoryType, ChecklistItem, CreatePhaseStepRequest, CreateTemplatePhaseRequest } from './template.type';
+import { stepTaskService, phaseStepService, templatePhaseService } from './projectTemplateService';
 import ChecklistManager from './ChecklistManager';
 import { SearchableRoleSelect } from './SearchableRoleSelect';
 
@@ -31,6 +31,7 @@ interface TaskFormModalProps {
   task?: StepTask;
   parentTaskId?: string; // For creating child tasks
   phaseSteps?: PhaseStep[]; // Available steps for selection when creating from phase level
+  templatePhases?: TemplatePhase[]; // Available phases for template-level task creation
   onSuccess: () => void;
 }
 
@@ -43,13 +44,15 @@ export default function TaskFormModal({
   task,
   parentTaskId,
   phaseSteps = [],
+  templatePhases = [],
   onSuccess 
 }: TaskFormModalProps) {
   const [formData, setFormData] = useState({
     task_name: '',
     description: '',
+    phase_id: '', // Added phase selection for template-level creation
     step_id: '', // Added step selection for phase-level creation
-    estimated_hours: undefined as number | undefined,
+    estimated_days: undefined as number | undefined,
     assigned_role_id: undefined as string | undefined,
     parent_task_id: undefined as string | undefined,
     category: undefined as TaskCategoryType | undefined,
@@ -59,6 +62,12 @@ export default function TaskFormModal({
   const [availableParentTasks, setAvailableParentTasks] = useState<(StepTask & { step_name?: string; phase_name?: string })[]>([]);
   const [loadingParentTasks, setLoadingParentTasks] = useState(false);
   const [parentTaskSearch, setParentTaskSearch] = useState('');
+  
+  // New phase creation states
+  const [showNewPhaseInput, setShowNewPhaseInput] = useState(false);
+  const [newPhaseName, setNewPhaseName] = useState('');
+  const [creatingPhase, setCreatingPhase] = useState(false);
+  const [localTemplatePhases, setLocalTemplatePhases] = useState<TemplatePhase[]>(templatePhases);
   
   // New step creation states
   const [showNewStepInput, setShowNewStepInput] = useState(false);
@@ -73,73 +82,49 @@ export default function TaskFormModal({
     const loadParentTasks = async () => {
       if (!opened) return;
       
+      console.log('🔍 Starting parent task search...', {
+        opened,
+        phaseId,
+        stepId,
+        templateId,
+        taskId: task?.task_id,
+        searchTerm: parentTaskSearch.trim(),
+        searchLength: parentTaskSearch.trim().length
+      });
+      
       try {
         setLoadingParentTasks(true);
         
-        if (phaseId) {
-          // Phase-level task creation - optimized for scaling to millions of tasks
-          console.log('Searching parent tasks for phase:', phaseId, 'search term:', parentTaskSearch.trim());
+        // Always allow template-wide parent task search regardless of context
+        console.log('🌍 Template-wide parent task search:', templateId, 'search term:', parentTaskSearch.trim());
+        
+        // Require minimum 2 characters for search to avoid expensive queries
+        if (parentTaskSearch.trim().length >= 2) {
+          console.log('⚡ Executing template-wide parent task search...');
           
-          // Require minimum 2 characters for search to avoid expensive queries
-          if (parentTaskSearch.trim().length >= 2) {
-            const searchResults = await stepTaskService.getAvailableParentTasksFromTemplateForPhase(
-              templateId,
-              phaseId, // Current phase ID for filtering
-              task?.task_id, // Exclude current task when editing
-              10, // Optimized for millions of tasks - fetch 10 at a time
-              parentTaskSearch.trim() // Server-side search
-            );
-            
-            console.log('Found', searchResults.length, 'parent tasks:', searchResults.map(t => `${t.task_name} (${t.phase_name})`));
-            setAvailableParentTasks(searchResults);
-          } else {
-            // Clear results when search term is too short
-            setAvailableParentTasks([]);
-          }
-        } else if (stepId) {
-          // Legacy step-level task creation - optimized for scaling
+          // Use template-wide search as the primary method (works in all contexts)
+          console.log('🔍 Using comprehensive template-wide search method...');
+          const searchResults = await stepTaskService.searchTemplateWideTasks(
+            templateId,
+            parentTaskSearch.trim(),
+            task?.task_id,
+            10
+          );
           
-          // Only search if we have a search term (to avoid expensive queries with millions of tasks)
-          if (parentTaskSearch.trim().length >= 2) {
-            // Get tasks from previous steps and phases using optimized search
-            const searchResults = await stepTaskService.searchAvailableParentTasks(
-              templateId,
-              stepId,
-              parentTaskSearch.trim(),
-              task?.task_id, // Exclude current task when editing
-              10 // Optimized for millions of tasks - fetch 10 at a time
-            );
-            
-            setAvailableParentTasks(searchResults);
-          } else {
-            // For current step tasks, only show if no search term to avoid loading too many
-            let currentStepTasks: StepTask[] = [];
-            if (!parentTaskSearch.trim()) {
-              currentStepTasks = await stepTaskService.getAvailableParentTasks(
-                stepId, 
-                task?.task_id, // Exclude current task when editing
-                10 // Limit to 10 for performance
-              );
-              
-              // Add current step context
-              const tasksWithContext = currentStepTasks.map(task => ({ 
-                ...task, 
-                step_name: undefined, 
-                phase_name: undefined 
-              }));
-              
-              setAvailableParentTasks(tasksWithContext);
-            } else {
-              // Clear results when search term is too short
-              setAvailableParentTasks([]);
-            }
-          }
+          console.log('✅ Template search results:', searchResults.length, 'tasks found');
+          console.log('📋 Tasks:', searchResults.map(t => `${t.task_name} (${t.step_name || 'Unknown Step'} - ${t.phase_name || 'Unknown Phase'})`));
+          setAvailableParentTasks(searchResults);
+        } else {
+          console.log('🔍 Search term too short, clearing results');
+          // Clear results when search term is too short
+          setAvailableParentTasks([]);
         }
       } catch (error) {
-        console.error('Error loading parent tasks:', error);
+        console.error('❌ Error loading parent tasks:', error);
         setAvailableParentTasks([]);
       } finally {
         setLoadingParentTasks(false);
+        console.log('🏁 Parent task search completed');
       }
     };
 
@@ -148,25 +133,99 @@ export default function TaskFormModal({
     return () => clearTimeout(debounceTimer);
   }, [opened, stepId, phaseId, templateId, task?.task_id, parentTaskSearch]);
 
+  // Load steps when phase is selected (for template-level task creation)
+  useEffect(() => {
+    const loadPhaseSteps = async () => {
+      if (!formData.phase_id || phaseId) return; // Skip if we already have phase context
+      
+      try {
+        const steps = await phaseStepService.getByPhaseId(formData.phase_id);
+        setLocalPhaseSteps(steps);
+        
+        // Auto-select first step if available
+        if (steps.length > 0 && !formData.step_id) {
+          setFormData(prev => ({
+            ...prev,
+            step_id: steps[0].step_id
+          }));
+        }
+      } catch (error) {
+        console.error('Error loading phase steps:', error);
+        setLocalPhaseSteps([]);
+      }
+    };
+
+    loadPhaseSteps();
+  }, [formData.phase_id, formData.step_id, phaseId]);
+
+  // Load phase information when editing a task by step_id
+  useEffect(() => {
+    const loadPhaseFromStep = async () => {
+      if (!task || !task.step_id || phaseId) return; // Skip if we already have phase context or not editing
+      
+      console.log('🔍 Loading phase info for task editing, step_id:', task.step_id);
+      
+      try {
+        // Get the step to find its phase_id
+        const step = await phaseStepService.getById(task.step_id);
+        console.log('📋 Found step:', step);
+        
+        if (step && step.phase_id) {
+          console.log('🎯 Setting phase_id:', step.phase_id);
+          setFormData(prev => ({
+            ...prev,
+            phase_id: step.phase_id
+          }));
+
+          // Load all phases to populate the dropdown
+          const allPhases = await templatePhaseService.getByTemplateId(templateId);
+          console.log('📚 Loaded all phases:', allPhases);
+          setLocalTemplatePhases(allPhases);
+
+          // Load steps for the phase
+          const stepsInPhase = await phaseStepService.getByPhaseId(step.phase_id);
+          console.log('📝 Loaded steps in phase:', stepsInPhase);
+          setLocalPhaseSteps(stepsInPhase);
+        }
+      } catch (error) {
+        console.error('❌ Error loading phase from step:', error);
+      }
+    };
+
+    loadPhaseFromStep();
+  }, [task, phaseId, templateId]);
 
   useEffect(() => {
     if (task) {
+      console.log('📝 [TaskFormModal] Populating form with task data:', {
+        task_id: task.task_id,
+        task_name: task.task_name,
+        step_id: task.step_id,
+        phaseId: phaseId,
+        parent_task_id: task.parent_task_id,
+        category: task.category
+      });
+      
       setFormData({
         task_name: task.task_name,
         description: task.description || '',
+        phase_id: phaseId || '', // Set current phase if available - will be updated by loadPhaseFromStep
         step_id: task.step_id,
-        estimated_hours: task.estimated_hours || undefined,
+        estimated_days: task.estimated_days || undefined,
         assigned_role_id: task.assigned_role_id || undefined,
         parent_task_id: task.parent_task_id || undefined,
         category: task.category || undefined,
         checklist_items: task.checklist_items || []
       });
+      
+      console.log('✅ [TaskFormModal] Form data set with initial values');
     } else {
       setFormData({
         task_name: '',
         description: '',
+        phase_id: phaseId || (localTemplatePhases.length > 0 ? localTemplatePhases[0].phase_id : ''), // Default to current phase or first available
         step_id: stepId || (localPhaseSteps.length > 0 ? localPhaseSteps[0].step_id : ''), // Default to first step for phase-level creation
-        estimated_hours: undefined,
+        estimated_days: undefined,
         assigned_role_id: undefined,
         parent_task_id: parentTaskId || undefined,
         category: undefined,
@@ -174,10 +233,74 @@ export default function TaskFormModal({
       });
     }
     
-    // Update local phase steps when phaseSteps prop changes
+    // Update local states when props change
     setLocalPhaseSteps(phaseSteps);
+    setLocalTemplatePhases(templatePhases);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [task, parentTaskId, stepId, phaseSteps]);
+  }, [task, parentTaskId, stepId, phaseId, phaseSteps, templatePhases]);
+
+  // Handle creating a new phase
+  const handleCreateNewPhase = async () => {
+    if (!newPhaseName.trim()) {
+      notifications.show({
+        title: 'Error',
+        message: 'Phase name is required',
+        color: 'red'
+      });
+      return;
+    }
+
+    setCreatingPhase(true);
+
+    try {
+      const createPhaseData: CreateTemplatePhaseRequest = {
+        template_id: templateId,
+        phase_name: newPhaseName.trim(),
+        description: `Created during task creation`
+      };
+
+      const newPhase = await templatePhaseService.create(createPhaseData);
+      
+      // Add the new phase to the local templatePhases array and sort by phase_order
+      const updatedTemplatePhases = [...localTemplatePhases, newPhase].sort((a, b) => a.phase_order - b.phase_order);
+      setLocalTemplatePhases(updatedTemplatePhases);
+      
+      // Update formData to select the newly created phase
+      setFormData(prev => ({
+        ...prev,
+        phase_id: newPhase.phase_id,
+        step_id: '' // Reset step selection since new phase has no steps yet
+      }));
+
+      // Clear local steps since new phase has no steps
+      setLocalPhaseSteps([]);
+
+      // Reset new phase creation state
+      setNewPhaseName('');
+      setShowNewPhaseInput(false);
+
+      notifications.show({
+        title: 'Success',
+        message: 'New phase created successfully',
+        color: 'green'
+      });
+
+      console.log('✅ [TaskFormModal] New phase created successfully:', newPhase.phase_id, 'and selected in form');
+
+      // Don't call onSuccess here - wait until the task is actually created
+      // The parent will be refreshed when the task is created and this modal closes
+
+    } catch (error) {
+      console.error('Error creating phase:', error);
+      notifications.show({
+        title: 'Error',
+        message: 'Failed to create new phase',
+        color: 'red'
+      });
+    } finally {
+      setCreatingPhase(false);
+    }
+  };
 
   // Handle creating a new step
   const handleCreateNewStep = async () => {
@@ -190,10 +313,11 @@ export default function TaskFormModal({
       return;
     }
 
-    if (!phaseId) {
+    const currentPhaseId = phaseId || formData.phase_id;
+    if (!currentPhaseId) {
       notifications.show({
         title: 'Error',
-        message: 'Phase ID is required to create a new step',
+        message: 'Phase selection is required to create a new step',
         color: 'red'
       });
       return;
@@ -203,7 +327,7 @@ export default function TaskFormModal({
 
     try {
       const createStepData: CreatePhaseStepRequest = {
-        phase_id: phaseId,
+        phase_id: currentPhaseId,
         step_name: newStepName.trim(),
         description: `Created during task creation`
       };
@@ -230,10 +354,10 @@ export default function TaskFormModal({
         color: 'green'
       });
 
-      // Trigger onSuccess to refresh the parent component's step list
-      if (onSuccess) {
-        onSuccess();
-      }
+      console.log('✅ [TaskFormModal] New step created successfully:', newStep.step_id, 'and selected in form');
+
+      // Don't call onSuccess here - wait until the task is actually created
+      // The parent will be refreshed when the task is created and this modal closes
 
     } catch (error) {
       console.error('Error creating step:', error);
@@ -259,8 +383,17 @@ export default function TaskFormModal({
       return;
     }
 
-    // Validate step selection for phase-level creation
-    if (phaseId && !formData.step_id) {
+    // Validate phase and step selection for template-level creation
+    if (!phaseId && !stepId && !formData.phase_id) {
+      notifications.show({
+        title: 'Error',
+        message: 'Phase selection is required',
+        color: 'red'
+      });
+      return;
+    }
+
+    if (!stepId && !formData.step_id) {
       notifications.show({
         title: 'Error',
         message: 'Step selection is required',
@@ -273,10 +406,18 @@ export default function TaskFormModal({
 
     try {
       if (isEditing && task) {
+        console.log('📝 [TaskFormModal] Updating task with data:', {
+          task_id: task.task_id,
+          current_step_id: task.step_id,
+          new_step_id: formData.step_id,
+          step_changed: task.step_id !== formData.step_id
+        });
+        
         const updateData: UpdateStepTaskRequest = {
           task_name: formData.task_name.trim(),
           description: formData.description.trim() || undefined,
-          estimated_hours: formData.estimated_hours || undefined,
+          step_id: formData.step_id || undefined, // Allow updating the step
+          estimated_days: formData.estimated_days || undefined,
           assigned_role_id: formData.assigned_role_id || undefined,
           parent_task_id: formData.parent_task_id || undefined,
           category: formData.category || undefined,
@@ -290,11 +431,20 @@ export default function TaskFormModal({
           color: 'green'
         });
       } else {
+        const finalStepId = formData.step_id || stepId!;
+        console.log('📝 [TaskFormModal] Creating new task with data:', {
+          step_id: finalStepId,
+          task_name: formData.task_name,
+          formData_step_id: formData.step_id,
+          legacy_stepId: stepId,
+          selected_step: finalStepId
+        });
+        
         const createData: CreateStepTaskRequest = {
-          step_id: formData.step_id || stepId!, // Use selected step or legacy stepId
+          step_id: finalStepId, // Use selected step or legacy stepId
           task_name: formData.task_name.trim(),
           description: formData.description.trim() || undefined,
-          estimated_hours: formData.estimated_hours || undefined,
+          estimated_days: formData.estimated_days || undefined,
           assigned_role_id: formData.assigned_role_id || undefined,
           parent_task_id: formData.parent_task_id || undefined,
           category: formData.category || undefined,
@@ -344,6 +494,12 @@ export default function TaskFormModal({
       label
     };
   });
+
+  // Create phase options for Select component
+  const phaseOptions = localTemplatePhases.map(phase => ({
+    value: phase.phase_id,
+    label: `${phase.phase_order}. ${phase.phase_name}`
+  }));
 
   // Create step options for Select component
   const stepOptions = localPhaseSteps.map(step => ({
@@ -396,8 +552,69 @@ export default function TaskFormModal({
             maxLength={1000}
           />
 
-          {/* Step Selection - only show for phase-level task creation */}
-          {phaseId && (
+          {/* Phase Selection - only show for template-level task creation */}
+          {!phaseId && !stepId && (
+            <Stack gap="sm">
+              <Group align="flex-end" gap="sm">
+                <Select
+                  label="Phase"
+                  placeholder="Select a phase for this task"
+                  value={formData.phase_id || null}
+                  onChange={(value) => setFormData(prev => ({ 
+                    ...prev, 
+                    phase_id: value || '',
+                    step_id: '' // Reset step when phase changes
+                  }))}
+                  data={phaseOptions}
+                  required
+                  description="Choose which phase this task belongs to"
+                  style={{ flex: 1 }}
+                />
+                <Tooltip label="Create new phase">
+                  <ActionIcon 
+                    size="lg" 
+                    variant="light" 
+                    color="blue"
+                    onClick={() => setShowNewPhaseInput(!showNewPhaseInput)}
+                  >
+                    <IconPlus size={16} />
+                  </ActionIcon>
+                </Tooltip>
+              </Group>
+              
+              {showNewPhaseInput && (
+                <Group align="flex-end" gap="sm">
+                  <TextInput
+                    label="New Phase Name"
+                    placeholder="Enter new phase name"
+                    value={newPhaseName}
+                    onChange={(e) => setNewPhaseName(e.target.value)}
+                    style={{ flex: 1 }}
+                  />
+                  <Button
+                    onClick={handleCreateNewPhase}
+                    loading={creatingPhase}
+                    disabled={!newPhaseName.trim()}
+                    color="green"
+                  >
+                    Create Phase
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowNewPhaseInput(false);
+                      setNewPhaseName('');
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </Group>
+              )}
+            </Stack>
+          )}
+
+          {/* Step Selection - show for phase-level or template-level task creation */}
+          {(phaseId || (!stepId && formData.phase_id)) && (
             <Stack gap="sm">
               <Group align="flex-end" gap="sm">
                 <Select
@@ -459,13 +676,13 @@ export default function TaskFormModal({
 
 
           <NumberInput
-            label="Estimated Hours"
-            placeholder="Enter estimated hours (optional)"
-            value={formData.estimated_hours}
+            label="Estimated Days"
+            placeholder="Enter estimated days (optional)"
+            value={formData.estimated_days}
             // @ts-ignore
             onChange={(value) => setFormData(prev => ({ 
               ...prev, 
-              estimated_hours: value || undefined
+              estimated_days: value || undefined
             }))}
             min={0}
             decimalScale={1}
@@ -485,9 +702,7 @@ export default function TaskFormModal({
               clearable
               onSearchChange={setParentTaskSearch}
               searchValue={parentTaskSearch}
-              description={phaseId 
-                ? "Search for a parent task from current and previous phases. Type at least 2 characters to start searching." 
-                : "Search for a parent task from current step or previous phases. Type at least 2 characters to start searching."}
+              description="Search for a parent task from anywhere in this template. Type at least 2 characters to start searching across all phases and steps."
               limit={10}
               nothingFoundMessage={
                 loadingParentTasks 
@@ -508,7 +723,7 @@ export default function TaskFormModal({
             
             {parentTaskSearch.trim().length >= 1 && parentTaskSearch.trim().length < 2 && (
               <Text size="xs" c="orange">
-                Type at least 2 characters to search through millions of tasks efficiently
+                Type at least 2 characters to search across all tasks in this template efficiently
               </Text>
             )}
             

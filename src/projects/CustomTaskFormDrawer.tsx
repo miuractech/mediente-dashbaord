@@ -13,12 +13,14 @@ import {
   MultiSelect,
   Divider,
   Card,
+  Loader,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconX, IconUsers, IconChecklist } from '@tabler/icons-react';
-import type { CreateCustomTaskInput, TaskCategoryType, CrewMember, AssignTaskCrewInput } from './project.typs';
+import type { CreateCustomTaskInput, TaskCategoryType, CrewMember, AssignTaskCrewInput, ProjectTaskWithAssignments } from './project.typs';
 import type { ChecklistItem } from '../template/template.type';
 import { useCreateCustomTask, useAvailableCrew, useAssignCrewToTask } from './project.hook';
+import { projectService } from './project.service';
 import ChecklistManager from '../template/ChecklistManager';
 
 interface CustomTaskFormDrawerProps {
@@ -43,12 +45,15 @@ export function CustomTaskFormDrawer({
   const [formData, setFormData] = useState<CreateCustomTaskInput>({
     task_name: '',
     task_description: '',
-    estimated_hours: undefined,
+    estimated_days: undefined,
     category: undefined,
     parent_task_id: undefined,
     checklist_items: [],
   });
   const [selectedCrewIds, setSelectedCrewIds] = useState<string[]>([]);
+  const [parentTaskSearch, setParentTaskSearch] = useState('');
+  const [availableParentTasks, setAvailableParentTasks] = useState<ProjectTaskWithAssignments[]>([]);
+  const [loadingParentTasks, setLoadingParentTasks] = useState(false);
 
   const { createCustomTask, loading } = useCreateCustomTask();
   const { crew: availableCrew, loading: crewLoading } = useAvailableCrew();
@@ -60,14 +65,71 @@ export function CustomTaskFormDrawer({
       setFormData({
         task_name: '',
         task_description: '',
-        estimated_hours: undefined,
+        estimated_days: undefined,
         category: undefined,
         parent_task_id: undefined,
         checklist_items: [],
       });
       setSelectedCrewIds([]);
+      setParentTaskSearch('');
+      setAvailableParentTasks([]);
     }
   }, [opened]);
+
+  // Load available parent tasks with search
+  useEffect(() => {
+    const loadParentTasks = async () => {
+      if (!opened) return;
+      
+      console.log('🔍 [CustomTaskFormDrawer] Starting parent task search...', {
+        opened,
+        projectId,
+        searchTerm: parentTaskSearch.trim(),
+        searchLength: parentTaskSearch.trim().length
+      });
+      
+      try {
+        setLoadingParentTasks(true);
+        
+        // Require minimum 2 characters for search to avoid expensive queries
+        if (parentTaskSearch.trim().length >= 2) {
+          console.log('⚡ [CustomTaskFormDrawer] Executing project parent task search...');
+          
+          const filters = {
+            project_id: projectId,
+            search: parentTaskSearch.trim(),
+            is_archived: false,
+          };
+          
+          console.log('📋 [CustomTaskFormDrawer] Search filters:', filters);
+          
+          // Get all project tasks
+          const availableTasks = await projectService.getProjectTasks(filters);
+          console.log('✅ [CustomTaskFormDrawer] Raw search results:', availableTasks.length, 'tasks found');
+          
+          // Limit to 10 results for performance
+          const limitedTasks = availableTasks.slice(0, 10);
+          console.log('📊 [CustomTaskFormDrawer] Final results (top 10):', limitedTasks.map(t => `${t.task_name} (${t.phase_name} - ${t.step_name})`));
+          
+          setAvailableParentTasks(limitedTasks);
+        } else {
+          console.log('🔍 [CustomTaskFormDrawer] Search term too short, clearing results');
+          // Clear results when search term is too short
+          setAvailableParentTasks([]);
+        }
+      } catch (error) {
+        console.error('❌ [CustomTaskFormDrawer] Error loading parent tasks:', error);
+        setAvailableParentTasks([]);
+      } finally {
+        setLoadingParentTasks(false);
+        console.log('🏁 [CustomTaskFormDrawer] Parent task search completed');
+      }
+    };
+
+    // Debounce the search for better performance
+    const debounceTimer = setTimeout(loadParentTasks, 300);
+    return () => clearTimeout(debounceTimer);
+  }, [opened, projectId, parentTaskSearch]);
 
   const handleSubmit = async () => {
     if (!formData.task_name.trim()) {
@@ -118,12 +180,14 @@ export function CustomTaskFormDrawer({
     setFormData({
       task_name: '',
       task_description: '',
-      estimated_hours: undefined,
+      estimated_days: undefined,
       category: undefined,
       parent_task_id: undefined,
       checklist_items: [],
     });
     setSelectedCrewIds([]);
+    setParentTaskSearch('');
+    setAvailableParentTasks([]);
     onClose();
   };
 
@@ -135,6 +199,12 @@ export function CustomTaskFormDrawer({
   const crewOptions = availableCrew.map(crew => ({
     value: crew.id,
     label: `${crew.name} (${crew.email})`,
+  }));
+
+  // Convert parent tasks for Select
+  const parentTaskOptions = availableParentTasks.map(task => ({
+    value: task.project_task_id,
+    label: `${task.task_name} (${task.phase_name} - ${task.step_name})`,
   }));
 
   return (
@@ -170,10 +240,10 @@ export function CustomTaskFormDrawer({
         />
 
         <NumberInput
-          label="Estimated Hours"
-          placeholder="Enter estimated hours"
-          value={formData.estimated_hours}
-          onChange={(value) => setFormData(prev => ({ ...prev, estimated_hours: value || undefined }))}
+          label="Estimated Days"
+          placeholder="Enter estimated days"
+          value={formData.estimated_days}
+          onChange={(value) => setFormData(prev => ({ ...prev, estimated_days: value || undefined }))}
           min={0}
           step={0.5}
           precision={1}
@@ -187,6 +257,33 @@ export function CustomTaskFormDrawer({
           data={taskCategories}
           searchable
           clearable
+        />
+
+        {/* Parent Task */}
+        <Select
+          label="Parent Task"
+          placeholder={parentTaskSearch.trim().length >= 2 ? "Search results (top 10)..." : "Type at least 2 characters to search..."}
+          value={formData.parent_task_id || ''}
+          onChange={(value) => setFormData(prev => ({ 
+            ...prev, 
+            parent_task_id: value || undefined
+          }))}
+          data={parentTaskOptions}
+          searchable
+          clearable
+          onSearchChange={setParentTaskSearch}
+          searchValue={parentTaskSearch}
+          description="Search for a parent task. Type at least 2 characters to start searching."
+          limit={10}
+          nothingFoundMessage={
+            loadingParentTasks 
+              ? "Searching..." 
+              : parentTaskSearch.trim().length >= 2
+                ? "No matching tasks found. Try different search terms." 
+                : "Type at least 2 characters to search for parent tasks"
+          }
+          rightSection={loadingParentTasks ? <Loader size="xs" /> : undefined}
+          maxDropdownHeight={400}
         />
 
         <Divider />

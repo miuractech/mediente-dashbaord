@@ -254,7 +254,7 @@ export function ProjectFormModal({ opened, onClose, onSuccess }: ProjectFormModa
                           {template.step_count} steps
                         </Text>
                         <Text size="xs" c="dimmed">
-                          {template.total_estimated_hours}h estimated
+                          {template.total_estimated_days}d estimated
                         </Text>
                         <Text size="xs" c="dimmed">
                           {template.roles_involved} roles
@@ -297,7 +297,7 @@ export function ProjectFormModal({ opened, onClose, onSuccess }: ProjectFormModa
                   {selectedTemplate.task_count} Tasks
                 </Badge>
                 <Badge variant="outline" size="sm">
-                  {selectedTemplate.total_estimated_hours}h Total
+                  {selectedTemplate.total_estimated_days}d Total
                 </Badge>
               </Group>
             </Card>

@@ -130,21 +130,22 @@ export function DraggablePhasesList({
   };
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragEnd={handleDragEnd}
-    >
-      <Table>
-        <Table.Thead>
-          <Table.Tr>
-            <Table.Th style={{ width: '40px' }}></Table.Th>
-            <Table.Th>Order</Table.Th>
-            <Table.Th>Name</Table.Th>
-            <Table.Th>Description</Table.Th>
-            <Table.Th>Actions</Table.Th>
-          </Table.Tr>
-        </Table.Thead>
+    <div style={{ overflowX: 'auto', width: '100%' }}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <Table style={{ minWidth: '800px' }}>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th style={{ minWidth: '50px', width: '50px' }}></Table.Th>
+              <Table.Th style={{ minWidth: '80px', width: '80px' }}>Order</Table.Th>
+              <Table.Th style={{ minWidth: '200px', width: '200px' }}>Name</Table.Th>
+              <Table.Th style={{ minWidth: '300px' }}>Description</Table.Th>
+              <Table.Th style={{ minWidth: '150px', width: '150px', position: 'sticky', right: 0, backgroundColor: 'white', zIndex: 1, borderLeft: '1px solid #dee2e6' }}>Actions</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
         <Table.Tbody>
           <SortableContext
             items={phases.map(p => p.phase_id)}
@@ -172,7 +173,7 @@ export function DraggablePhasesList({
                     {phase.description || 'No description'}
                   </Text>
                 </Table.Td>
-                <Table.Td onClick={(e) => e.stopPropagation()}>
+                <Table.Td onClick={(e) => e.stopPropagation()} style={{ position: 'sticky', right: 0, backgroundColor: 'white', zIndex: 1, borderLeft: '1px solid #dee2e6' }}>
                   <Menu shadow="md" width={200}>
                     <Menu.Target>
                       <ActionIcon variant="subtle" color="gray">
@@ -217,8 +218,9 @@ export function DraggablePhasesList({
             ))}
           </SortableContext>
         </Table.Tbody>
-      </Table>
-    </DndContext>
+        </Table>
+      </DndContext>
+    </div>
   );
 }
 
@@ -266,21 +268,22 @@ export function DraggableStepsList({
   };
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragEnd={handleDragEnd}
-    >
-      <Table>
-        <Table.Thead>
-          <Table.Tr>
-            <Table.Th style={{ width: '40px' }}></Table.Th>
-            <Table.Th>Order</Table.Th>
-            <Table.Th>Name</Table.Th>
-            <Table.Th>Description</Table.Th>
-            <Table.Th>Actions</Table.Th>
-          </Table.Tr>
-        </Table.Thead>
+    <div style={{ overflowX: 'auto', width: '100%' }}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <Table style={{ minWidth: '800px' }}>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th style={{ minWidth: '50px', width: '50px' }}></Table.Th>
+              <Table.Th style={{ minWidth: '80px', width: '80px' }}>Order</Table.Th>
+              <Table.Th style={{ minWidth: '200px', width: '200px' }}>Name</Table.Th>
+              <Table.Th style={{ minWidth: '300px' }}>Description</Table.Th>
+              <Table.Th style={{ minWidth: '150px', width: '150px', position: 'sticky', right: 0, backgroundColor: 'white', zIndex: 1, borderLeft: '1px solid #dee2e6' }}>Actions</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
         <Table.Tbody>
           <SortableContext
             items={steps.map(s => s.step_id)}
@@ -308,7 +311,7 @@ export function DraggableStepsList({
                     {step.description || 'No description'}
                   </Text>
                 </Table.Td>
-                <Table.Td onClick={(e) => e.stopPropagation()}>
+                <Table.Td onClick={(e) => e.stopPropagation()} style={{ position: 'sticky', right: 0, backgroundColor: 'white', zIndex: 1, borderLeft: '1px solid #dee2e6' }}>
                   <Menu shadow="md" width={200}>
                     <Menu.Target>
                       <ActionIcon variant="subtle" color="gray">
@@ -364,8 +367,9 @@ export function DraggableStepsList({
             ))}
           </SortableContext>
         </Table.Tbody>
-      </Table>
-    </DndContext>
+        </Table>
+      </DndContext>
+    </div>
   );
 }
 
@@ -392,6 +396,7 @@ interface DraggablePhaseTasksListProps {
   getRoleName: (roleId?: string) => string;
   templateId: string;
 }
+
 
 export function DraggablePhaseTasksList({
   tasks,
@@ -532,27 +537,28 @@ export function DraggablePhaseTasksList({
   };
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragEnd={handleDragEnd}
-    >
-      <Table striped highlightOnHover>
-        <Table.Thead>
-          <Table.Tr>
-            <Table.Th style={{ width: '40px' }}></Table.Th>
-            <Table.Th style={{ width: '60px' }}>Order</Table.Th>
-            <Table.Th style={{ width: '180px' }}>Task Name</Table.Th>
-            <Table.Th style={{ width: '100px' }}>Step</Table.Th>
-            <Table.Th style={{ width: '160px' }}>Parent Task</Table.Th>
-            <Table.Th style={{ width: '100px' }}>Category</Table.Th>
-            <Table.Th style={{ width: '80px' }}>Checklist</Table.Th>
-            <Table.Th style={{ width: '70px' }}>Hours</Table.Th>
-            <Table.Th style={{ width: '120px' }}>Assigned To</Table.Th>
-            <Table.Th>Description</Table.Th>
-            <Table.Th style={{ width: '100px' }}>Actions</Table.Th>
-          </Table.Tr>
-        </Table.Thead>
+    <div style={{ overflowX: 'auto', width: '100%' }}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <Table striped highlightOnHover style={{ minWidth: '1500px' }}>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th style={{ minWidth: '50px', width: '50px' }}></Table.Th>
+              <Table.Th style={{ minWidth: '80px', width: '80px' }}>Order</Table.Th>
+              <Table.Th style={{ minWidth: '250px', width: '250px' }}>Task Name</Table.Th>
+              <Table.Th style={{ minWidth: '180px', width: '180px' }}>Step</Table.Th>
+              <Table.Th style={{ minWidth: '200px', width: '200px' }}>Parent Task</Table.Th>
+              <Table.Th style={{ minWidth: '120px', width: '120px' }}>Category</Table.Th>
+              <Table.Th style={{ minWidth: '100px', width: '100px' }}>Checklist</Table.Th>
+              <Table.Th style={{ minWidth: '80px', width: '80px' }}>Days</Table.Th>
+              <Table.Th style={{ minWidth: '150px', width: '150px' }}>Assigned To</Table.Th>
+              <Table.Th style={{ minWidth: '300px' }}>Description</Table.Th>
+              <Table.Th style={{ minWidth: '120px', width: '120px', position: 'sticky', right: 0, backgroundColor: 'white', zIndex: 1, borderLeft: '1px solid #dee2e6' }}>Actions</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
         <Table.Tbody>
           <SortableContext
             items={tasks.map(t => t.task_id)}
@@ -561,19 +567,21 @@ export function DraggablePhaseTasksList({
             {tasks.map((task) => (
               <SortableItem key={task.task_id} id={task.task_id}>
                 <Table.Td>
-                  <Badge variant="light" size="sm">{task.task_order}</Badge>
+                  <Text fw={500} size="sm">{task.task_order}</Text>
                 </Table.Td>
                 <Table.Td>
-                  <Text fw={500} size="sm">{task.task_name}</Text>
+                  <Text fw={500} size="sm" style={{ wordWrap: 'break-word', whiteSpace: 'normal' }}>
+                    {task.task_name}
+                  </Text>
                 </Table.Td>
                 <Table.Td>
-                  <Badge variant="outline" color="blue" size="sm">
+                  <Text size="sm" style={{ wordWrap: 'break-word', whiteSpace: 'normal' }}>
                     {task.step_name}
-                  </Badge>
+                  </Text>
                 </Table.Td>
                 <Table.Td>
                   {task.parent_task_id ? (
-                    <Text size="sm" c="blue" style={{ wordBreak: 'break-word' }}>
+                    <Text size="sm" c="blue" style={{ wordWrap: 'break-word', whiteSpace: 'normal' }}>
                       {getParentTaskName(task.parent_task_id)}
                     </Text>
                   ) : (
@@ -604,7 +612,7 @@ export function DraggablePhaseTasksList({
                 </Table.Td>
                 <Table.Td>
                   <Text size="sm">
-                    {task.estimated_hours ? `${task.estimated_hours}h` : '-'}
+                    {task.estimated_days ? `${task.estimated_days}d` : '-'}
                   </Text>
                 </Table.Td>
                 <Table.Td>
@@ -617,11 +625,11 @@ export function DraggablePhaseTasksList({
                   </Badge>
                 </Table.Td>
                 <Table.Td>
-                  <Text size="sm" c="dimmed" lineClamp={2}>
+                  <Text size="sm" c="dimmed" style={{ wordWrap: 'break-word', whiteSpace: 'normal' }}>
                     {task.description || 'No description'}
                   </Text>
                 </Table.Td>
-                <Table.Td>
+                <Table.Td style={{ position: 'sticky', right: 0, backgroundColor: 'white', zIndex: 1, borderLeft: '1px solid #dee2e6' }}>
                   <Menu shadow="md" width={200}>
                     <Menu.Target>
                       <ActionIcon variant="subtle" color="gray" size="sm">
@@ -665,8 +673,9 @@ export function DraggablePhaseTasksList({
             ))}
           </SortableContext>
         </Table.Tbody>
-      </Table>
-    </DndContext>
+        </Table>
+      </DndContext>
+    </div>
   );
 }
 
@@ -819,25 +828,26 @@ export function DraggableTasksList({
   };
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragEnd={handleDragEnd}
-    >
-             <Table striped highlightOnHover>
-         <Table.Thead>
-           <Table.Tr>
-             <Table.Th style={{ width: '40px' }}></Table.Th>
-             <Table.Th style={{ width: '60px' }}>Order</Table.Th>
-             <Table.Th style={{ width: '200px' }}>Task Name</Table.Th>
-             <Table.Th style={{ width: '120px' }}>Category</Table.Th>
-             <Table.Th style={{ width: '100px' }}>Checklist</Table.Th>
-             <Table.Th style={{ width: '80px' }}>Hours</Table.Th>
-             <Table.Th style={{ width: '120px' }}>Assigned To</Table.Th>
-             <Table.Th>Description</Table.Th>
-             <Table.Th style={{ width: '100px' }}>Actions</Table.Th>
-           </Table.Tr>
-         </Table.Thead>
+    <div style={{ overflowX: 'auto', width: '100%' }}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <Table striped highlightOnHover style={{ minWidth: '1300px' }}>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th style={{ minWidth: '50px', width: '50px' }}></Table.Th>
+              <Table.Th style={{ minWidth: '80px', width: '80px' }}>Order</Table.Th>
+              <Table.Th style={{ minWidth: '300px', width: '300px' }}>Task Name</Table.Th>
+              <Table.Th style={{ minWidth: '120px', width: '120px' }}>Category</Table.Th>
+              <Table.Th style={{ minWidth: '100px', width: '100px' }}>Checklist</Table.Th>
+              <Table.Th style={{ minWidth: '80px', width: '80px' }}>Days</Table.Th>
+              <Table.Th style={{ minWidth: '150px', width: '150px' }}>Assigned To</Table.Th>
+              <Table.Th style={{ minWidth: '350px' }}>Description</Table.Th>
+              <Table.Th style={{ minWidth: '120px', width: '120px', position: 'sticky', right: 0, backgroundColor: 'white', zIndex: 1, borderLeft: '1px solid #dee2e6' }}>Actions</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
         <Table.Tbody>
           <SortableContext
             items={tasks.map(t => t.task_id)}
@@ -846,12 +856,14 @@ export function DraggableTasksList({
             {tasks.map((task) => (
                              <SortableItem key={task.task_id} id={task.task_id}>
                  <Table.Td>
-                   <Badge variant="light" size="sm">{task.task_order}</Badge>
+                   <Text fw={500} size="sm">{task.task_order}</Text>
                  </Table.Td>
                  <Table.Td>
-                   <Text fw={500} size="sm">{task.task_name}</Text>
+                   <Text fw={500} size="sm" style={{ wordWrap: 'break-word', whiteSpace: 'normal' }}>
+                     {task.task_name}
+                   </Text>
                    {task.parent_task_id && (
-                     <Text size="xs" c="dimmed" mt={2}>
+                     <Text size="xs" c="dimmed" mt={2} style={{ wordWrap: 'break-word', whiteSpace: 'normal' }}>
                        Parent: {getParentTaskName(task.parent_task_id)}
                      </Text>
                    )}
@@ -880,7 +892,7 @@ export function DraggableTasksList({
                  </Table.Td>
                  <Table.Td>
                    <Text size="sm">
-                     {task.estimated_hours ? `${task.estimated_hours}h` : '-'}
+                     {task.estimated_days ? `${task.estimated_days}d` : '-'}
                    </Text>
                  </Table.Td>
                  <Table.Td>
@@ -893,11 +905,11 @@ export function DraggableTasksList({
                    </Badge>
                  </Table.Td>
                  <Table.Td>
-                   <Text size="sm" c="dimmed" lineClamp={2}>
+                   <Text size="sm" c="dimmed" style={{ wordWrap: 'break-word', whiteSpace: 'normal' }}>
                      {task.description || 'No description'}
                    </Text>
                  </Table.Td>
-                <Table.Td>
+                <Table.Td style={{ position: 'sticky', right: 0, backgroundColor: 'white', zIndex: 1, borderLeft: '1px solid #dee2e6' }}>
                   <Menu shadow="md" width={200}>
                     <Menu.Target>
                       <ActionIcon variant="subtle" color="gray" size="sm">
@@ -941,7 +953,8 @@ export function DraggableTasksList({
             ))}
           </SortableContext>
         </Table.Tbody>
-      </Table>
-    </DndContext>
+        </Table>
+      </DndContext>
+    </div>
   );
 }

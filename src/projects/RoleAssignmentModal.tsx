@@ -13,9 +13,9 @@ import {
 } from '@mantine/core';
 import { IconUserPlus } from '@tabler/icons-react';
 import {
+  useUnassignedCrew,
   useAvailableCrew,
   useAssignCrewToRole,
-  useProjectCrewAssignments,
   useRemoveCrewFromProject,
 } from './project.hook';
 import { CrewFormModal } from '../crew/CrewFormModal';
@@ -45,8 +45,13 @@ export function RoleAssignmentModal({
   const [debouncedSearchTerm] = useDebouncedValue(searchTerm, 300);
 
   const { user } = useAuth();
-  const { crew, loading: crewLoading, refetch: refetchCrew } = useAvailableCrew(debouncedSearchTerm, 10);
-  const { assignments } = useProjectCrewAssignments(projectId);
+  // Use unassigned crew for new assignments, all crew for reassignments
+  const { crew: unassignedCrew, loading: unassignedLoading, refetch: refetchUnassigned } = useUnassignedCrew(projectId, debouncedSearchTerm, 10);
+  const { crew: allCrew, loading: allCrewLoading, refetch: refetchAllCrew } = useAvailableCrew(debouncedSearchTerm, 10);
+  
+  const crew = currentAssignmentId ? allCrew : unassignedCrew;
+  const crewLoading = currentAssignmentId ? allCrewLoading : unassignedLoading;
+  
   const { assignCrew, loading: assignLoading } = useAssignCrewToRole();
   const { removeCrew, loading: removeLoading } = useRemoveCrewFromProject();
 
@@ -61,17 +66,15 @@ export function RoleAssignmentModal({
 
   const handleCrewCreated = () => {
     setCrewFormModalOpened(false);
-    refetchCrew();
+    refetchUnassigned();
+    refetchAllCrew();
   };
 
   if (!role) return null;
 
-  // Get already assigned crew IDs to filter them out
-  const assignedCrewIds = assignments.map(a => a.crew_id);
-  // For reassignment, include all crew; for new assignment, exclude assigned ones
-  const availableCrew = currentAssignmentId 
-    ? crew.filter(c => c.status && !c.is_archived)
-    : crew.filter(c => !assignedCrewIds.includes(c.id) && c.status && !c.is_archived);
+  // Crew is already filtered by backend to exclude assigned ones
+  // For reassignment, we might want to show all crew, but for now keep the same logic
+  const availableCrew = crew;
 
   return (
     <Modal

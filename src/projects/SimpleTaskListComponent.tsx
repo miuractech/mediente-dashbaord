@@ -360,12 +360,12 @@ export function SimpleTaskListComponent({ projectId, onTaskEdit, onTaskClick, st
 
                   {/* Task Details */}
                   <Group gap="md" mb="sm">
-                    {/* Estimated Hours */}
-                    {task.estimated_hours && (
+                    {/* Estimated Days */}
+                    {task.estimated_days && (
                       <Group gap="xs">
                         <IconClock size={14} color="gray" />
                         <Text size="xs" c="dimmed">
-                          {task.estimated_hours}h estimated
+                          {task.estimated_days}d estimated
                         </Text>
                       </Group>
                     )}

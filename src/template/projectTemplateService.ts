@@ -672,17 +672,41 @@ export const stepTaskService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    // Get next order number
+    // Get the template_id from the step to calculate template-wide task order
+    const { data: stepData, error: stepError } = await supabase
+      .from('phase_steps')
+      .select(`
+        template_phases!inner(template_id)
+      `)
+      .eq('step_id', task.step_id)
+      .single();
+
+    if (stepError) {
+      console.error('❌ [stepTaskService.create] Error fetching step template:', stepError);
+      throw stepError;
+    }
+
+    const templateId = stepData.template_phases.template_id;
+    console.log('📝 [stepTaskService.create] Creating task for template:', templateId);
+
+    // Get next template-wide order number to satisfy unique constraint
     const { data: existingTasks } = await supabase
       .from('step_tasks')
-      .select('task_order')
-      .eq('step_id', task.step_id)
+      .select(`
+        task_order,
+        phase_steps!inner(
+          template_phases!inner(template_id)
+        )
+      `)
+      .eq('phase_steps.template_phases.template_id', templateId)
       .order('task_order', { ascending: false })
       .limit(1);
 
     const nextOrder = existingTasks && existingTasks.length > 0 
       ? existingTasks[0].task_order + 1 
       : 1;
+
+    console.log('📊 [stepTaskService.create] Calculated next task order:', nextOrder, 'for template:', templateId);
 
     const { data, error } = await supabase
       .from('step_tasks')
@@ -694,7 +718,12 @@ export const stepTaskService = {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ [stepTaskService.create] Error creating task:', error);
+      throw error;
+    }
+    
+    console.log('✅ [stepTaskService.create] Task created successfully with order:', data.task_order);
     return data;
   },
 
@@ -738,40 +767,35 @@ export const stepTaskService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    // Use a transaction to avoid unique constraint violations
-    // First, set all orders to negative values to avoid conflicts
-    const tempUpdates = taskOrders.map(({ task_id }, index) => ({
-      task_id,
-      temp_order: -(index + 1000) // Use negative numbers to avoid conflicts
-    }));
+    // Call the SQL function to handle reordering safely
+    const { error } = await supabase.rpc('reorder_template_items', {
+      parent_id: stepId,
+      item_type: 'tasks',
+      item_orders: taskOrders.map(({ task_id, task_order }) => ({
+        id: task_id,
+        order: task_order
+      }))
+    });
 
-    // Step 1: Set temporary negative orders
-    for (const { task_id, temp_order } of tempUpdates) {
-      const { error } = await supabase
-        .from('step_tasks')
-        .update({
-          task_order: temp_order,
-          updated_by: user.email || user.id
-        })
-        .eq('task_id', task_id)
-        .eq('step_id', stepId);
+    if (error) throw error;
+  },
 
-      if (error) throw error;
-    }
+  // Reorder tasks globally across the entire template
+  async reorderGlobally(templateId: string, taskOrders: { task_id: string; task_order: number }[]): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
 
-    // Step 2: Set final positive orders
-    for (const { task_id, task_order } of taskOrders) {
-      const { error } = await supabase
-        .from('step_tasks')
-        .update({
-          task_order,
-          updated_by: user.email || user.id
-        })
-        .eq('task_id', task_id)
-        .eq('step_id', stepId);
+    // Call the SQL function to handle global task reordering
+    const { error } = await supabase.rpc('reorder_template_items', {
+      parent_id: templateId,
+      item_type: 'tasks',
+      item_orders: taskOrders.map(({ task_id, task_order }) => ({
+        id: task_id,
+        order: task_order
+      }))
+    });
 
-      if (error) throw error;
-    }
+    if (error) throw error;
   },
 
   // Get available parent tasks for a step (excluding the task itself and its descendants)
@@ -1001,6 +1025,63 @@ export const stepTaskService = {
     }));
   },
 
+  // Get all tasks from all phases in a template
+  async getByTemplateId(templateId: string): Promise<(StepTask & { step_name: string; step_order: number; phase_name: string; phase_order: number })[]> {
+    const { data, error } = await supabase
+      .from('step_tasks')
+      .select(`
+        *,
+        phase_steps!inner(
+          step_name,
+          step_order,
+          template_phases!inner(
+            phase_name,
+            phase_order,
+            template_id
+          )
+        )
+      `)
+      .eq('phase_steps.template_phases.template_id', templateId)
+      .eq('is_archived', false)
+      .order('task_order', { ascending: true });
+
+    if (error) throw error;
+
+    const tasks = (data || []).map(task => {
+      // Type assertion for the nested Supabase response structure
+      const phaseSteps = task.phase_steps as unknown as {
+        step_name: string;
+        step_order: number;
+        template_phases: {
+          phase_name: string;
+          phase_order: number;
+        };
+      };
+      
+      return {
+        ...task,
+        step_name: phaseSteps?.step_name || '',
+        step_order: phaseSteps?.step_order || 0,
+        phase_name: phaseSteps?.template_phases?.phase_name || '',
+        phase_order: phaseSteps?.template_phases?.phase_order || 0
+      };
+    });
+
+    // Sort in JavaScript since PostgreSQL nested ordering isn't supported
+    return tasks.sort((a, b) => {
+      // First sort by phase order
+      if (a.phase_order !== b.phase_order) {
+        return a.phase_order - b.phase_order;
+      }
+      // Then by step order within the same phase
+      if (a.step_order !== b.step_order) {
+        return a.step_order - b.step_order;
+      }
+      // Finally by task order within the same step
+      return a.task_order - b.task_order;
+    });
+  },
+
   // Get available parent tasks from current phase and previous phases for phase-level task creation
   async getAvailableParentTasksFromTemplateForPhase(
     templateId: string, 
@@ -1141,6 +1222,84 @@ export const stepTaskService = {
     });
 
     return rootTasks;
+  },
+
+  // Search all tasks across entire template (template-wide parent task search)
+  async searchTemplateWideTasks(
+    templateId: string,
+    searchTerm: string = '',
+    excludeTaskId?: string,
+    limit: number = 10
+  ): Promise<(StepTask & { step_name: string; phase_name: string; phase_order: number; step_order: number })[]> {
+    console.log('🔍 [stepTaskService.searchTemplateWideTasks] Starting template-wide search:', {
+      templateId,
+      searchTerm,
+      excludeTaskId,
+      limit
+    });
+
+    // Search across all tasks in the template with step and phase context
+    const { data, error } = await supabase
+      .from('step_tasks')
+      .select(`
+        *,
+        phase_steps!inner(
+          step_name,
+          step_order,
+          template_phases!inner(
+            phase_name,
+            phase_order,
+            template_id
+          )
+        )
+      `)
+      .eq('phase_steps.template_phases.template_id', templateId)
+      .eq('is_archived', false)
+      .ilike('task_name', `%${searchTerm}%`)
+      .order('task_order', { ascending: true })
+      .limit(limit);
+
+    if (error) {
+      console.error('❌ [stepTaskService.searchTemplateWideTasks] Database error:', error);
+      console.error('❌ [stepTaskService.searchTemplateWideTasks] Error details:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      });
+      throw error;
+    }
+
+    console.log('✅ [stepTaskService.searchTemplateWideTasks] Raw query results:', data?.length || 0, 'tasks');
+    console.log('🔍 [stepTaskService.searchTemplateWideTasks] Sample data structure:', data?.[0]);
+
+    if (!data) return [];
+
+    // Transform the nested structure to flat tasks with context
+    const flatTasks = data.map(task => ({
+      ...task,
+      step_name: task.phase_steps.step_name,
+      step_order: task.phase_steps.step_order,
+      phase_name: task.phase_steps.template_phases.phase_name,
+      phase_order: task.phase_steps.template_phases.phase_order,
+    })).filter(task => {
+      // Exclude current task if specified
+      return !excludeTaskId || task.task_id !== excludeTaskId;
+    }).sort((a, b) => {
+      // Sort by phase_order, then step_order, then task_order
+      if (a.phase_order !== b.phase_order) {
+        return a.phase_order - b.phase_order;
+      }
+      if (a.step_order !== b.step_order) {
+        return a.step_order - b.step_order;
+      }
+      return a.task_order - b.task_order;
+    });
+
+    console.log('📋 [stepTaskService.searchTemplateWideTasks] Processed results:', flatTasks.length, 'tasks');
+    console.log('📊 [stepTaskService.searchTemplateWideTasks] Task list:', flatTasks.map(t => `${t.task_name} (${t.step_name} - ${t.phase_name})`));
+
+    return flatTasks;
   }
 };
 

@@ -1355,6 +1355,43 @@ export function useAvailableCrew(searchTerm?: string, limit?: number) {
   };
 }
 
+export function useUnassignedCrew(projectId: string, searchTerm?: string, limit: number = 10) {
+  const [crew, setCrew] = useState<CrewMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchCrew = useCallback(async () => {
+    if (!projectId) return;
+    
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await projectService.getUnassignedCrew(projectId, searchTerm, limit);
+      setCrew(data);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch unassigned crew';
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId, searchTerm, limit]);
+
+  useEffect(() => {
+    fetchCrew();
+  }, [fetchCrew]);
+
+  const refetch = useCallback(() => {
+    fetchCrew();
+  }, [fetchCrew]);
+
+  return {
+    crew,
+    loading,
+    error,
+    refetch,
+  };
+}
+
 export function useStartProject() {
   const [loading, setLoading] = useState(false);
 

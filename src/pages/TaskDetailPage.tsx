@@ -68,7 +68,7 @@ export default function TaskDetailPage() {
   const [editData, setEditData] = useState({
     task_name: '',
     task_description: '',
-    estimated_hours: 0,
+    estimated_days: 0,
   });
 
   const { crew: availableCrew, loading: crewLoading } = useAvailableCrew(debouncedCrewSearchTerm);
@@ -81,7 +81,7 @@ export default function TaskDetailPage() {
       setEditData({
         task_name: task.task_name,
         task_description: task.task_description || '',
-        estimated_hours: task.estimated_hours || 0,
+        estimated_days: task.estimated_days || 0,
       });
     }
   }, [task]);
@@ -175,7 +175,7 @@ export default function TaskDetailPage() {
       setEditData({
         task_name: task.task_name,
         task_description: task.task_description || '',
-        estimated_hours: task.estimated_hours || 0,
+        estimated_days: task.estimated_days || 0,
       });
     }
     setEditMode(!editMode);
@@ -185,7 +185,7 @@ export default function TaskDetailPage() {
     const success = await updateTask(task.project_task_id, {
       task_name: editData.task_name,
       task_description: editData.task_description || undefined,
-      estimated_hours: editData.estimated_hours || undefined,
+      estimated_days: editData.estimated_days || undefined,
     });
     
     if (success) {
@@ -258,9 +258,9 @@ export default function TaskDetailPage() {
                   variant="filled"
                 />
                 <NumberInput
-                  label="Estimated Hours"
-                  value={editData.estimated_hours}
-                  onChange={(value: string | number) => setEditData(prev => ({ ...prev, estimated_hours: Number(value) || 0 }))}
+                  label="Estimated Days"
+                  value={editData.estimated_days}
+                  onChange={(value: string | number) => setEditData(prev => ({ ...prev, estimated_days: Number(value) || 0 }))}
                   min={0}
                   step={0.5}
                   decimalScale={1}
@@ -402,15 +402,15 @@ export default function TaskDetailPage() {
                     Step {task.step_order}: {task.step_name}
                   </Badge>
                 </Group>
-                {task.estimated_hours && (
+                {task.estimated_days && (
                   <Group justify="space-between">
-                    <Text size="sm" c="dimmed">Estimated Hours:</Text>
-                    <Text size="sm">{task.estimated_hours}h</Text>
+                    <Text size="sm" c="dimmed">Estimated Days:</Text>
+                    <Text size="sm">{task.estimated_days}d</Text>
                   </Group>
                 )}
                 <Group justify="space-between">
-                  <Text size="sm" c="dimmed">Actual Hours:</Text>
-                  <Text size="sm">{task.actual_hours}h</Text>
+                  <Text size="sm" c="dimmed">Actual Days:</Text>
+                  <Text size="sm">{task.actual_days}d</Text>
                 </Group>
                 {task.deadline && (
                   <Group justify="space-between">
@@ -634,9 +634,9 @@ export default function TaskDetailPage() {
                       <Group gap="xs">
                         <IconFile size={16} />
                         <div>
-                          <Text size="sm">{file.name}</Text>
+                          <Text size="sm">{file.file_name}</Text>
                           <Text size="xs" c="dimmed">
-                            {(file.size / 1024 / 1024).toFixed(2)} MB
+                            {(file.file_size / 1024 / 1024).toFixed(2)} MB
                           </Text>
                         </div>
                       </Group>

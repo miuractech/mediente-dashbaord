@@ -138,8 +138,8 @@ CREATE TABLE IF NOT EXISTS project_tasks (
   step_name VARCHAR(200) NOT NULL,
   step_order INTEGER NOT NULL,
   task_order INTEGER NOT NULL,
-  estimated_hours INTEGER CHECK (estimated_hours >= 0),
-  actual_hours INTEGER DEFAULT 0 CHECK (actual_hours >= 0),
+  estimated_days INTEGER CHECK (estimated_days >= 0),
+  actual_days INTEGER DEFAULT 0 CHECK (actual_days >= 0),
   parent_task_id UUID REFERENCES project_tasks(project_task_id) ON DELETE CASCADE,
   task_status task_status_type DEFAULT 'pending' NOT NULL,
   category task_category_type,
@@ -167,6 +167,43 @@ CREATE TABLE IF NOT EXISTS project_tasks (
   CHECK (completed_at IS NULL OR started_at IS NOT NULL),
   CHECK (escalated_at IS NULL OR task_status = 'escalated')
 );
+
+-- Migration: Handle existing databases with estimated_hours/actual_hours columns
+DO $$
+BEGIN
+    -- Check if we have the old estimated_hours column but not estimated_days
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'project_tasks' AND column_name = 'estimated_hours'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'project_tasks' AND column_name = 'estimated_days'
+    ) THEN
+        -- Add the new columns
+        ALTER TABLE project_tasks ADD COLUMN estimated_days INTEGER CHECK (estimated_days >= 0);
+        ALTER TABLE project_tasks ADD COLUMN actual_days INTEGER DEFAULT 0 CHECK (actual_days >= 0);
+        
+        -- Copy data from old columns to new columns
+        UPDATE project_tasks SET estimated_days = estimated_hours WHERE estimated_hours IS NOT NULL;
+        UPDATE project_tasks SET actual_days = actual_hours WHERE actual_hours IS NOT NULL;
+        
+        -- Drop the old columns
+        ALTER TABLE project_tasks DROP COLUMN estimated_hours;
+        ALTER TABLE project_tasks DROP COLUMN actual_hours;
+        
+        RAISE NOTICE 'Migrated estimated_hours/actual_hours to estimated_days/actual_days columns in project_tasks';
+    ELSIF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'project_tasks' AND column_name = 'estimated_days'
+    ) THEN
+        -- Add estimated_days/actual_days columns if they don't exist
+        ALTER TABLE project_tasks ADD COLUMN estimated_days INTEGER CHECK (estimated_days >= 0);
+        ALTER TABLE project_tasks ADD COLUMN actual_days INTEGER DEFAULT 0 CHECK (actual_days >= 0);
+        RAISE NOTICE 'Added estimated_days/actual_days columns to project_tasks';
+    ELSE
+        RAISE NOTICE 'estimated_days/actual_days columns already exist in project_tasks';
+    END IF;
+END $$;
 
 -- Create indexes for project_tasks
 CREATE INDEX IF NOT EXISTS idx_project_tasks_project_id ON project_tasks(project_id);
@@ -422,7 +459,7 @@ BEGIN
                     INSERT INTO project_tasks (
                         project_id, template_task_id, task_name, task_description,
                         phase_name, phase_order, step_name, step_order, task_order,
-                        estimated_hours, parent_task_id, category, checklist_items,
+                        estimated_days, parent_task_id, category, checklist_items,
                         is_loaded, created_by
                     ) VALUES (
                         p_project_id,
@@ -434,7 +471,7 @@ BEGIN
                         step_data->'step'->>'step_name',
                         (step_data->'step'->>'step_order')::INTEGER,
                         (task_data->>'task_order')::INTEGER,
-                        (task_data->>'estimated_hours')::INTEGER,
+                        (task_data->>'estimated_days')::INTEGER,
                         parent_task_id,
                         (task_data->>'category')::task_category_type,
                         COALESCE(task_data->'checklist_items', '[]'::jsonb),
@@ -489,6 +526,163 @@ BEGIN
 
     RAISE NOTICE 'Successfully loaded % tasks for phase % in project %', tasks_loaded, next_phase_order, p_project_id;
     RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to load all tasks from all phases at once (for initial project start)
+CREATE OR REPLACE FUNCTION load_all_project_tasks(p_project_id UUID)
+RETURNS BOOLEAN AS $$
+DECLARE
+    project_record RECORD;
+    phase_data JSONB;
+    step_data JSONB;
+    task_data JSONB;
+    tasks_loaded INTEGER := 0;
+    parent_task_id UUID;
+    template_parent_id UUID;
+BEGIN
+    -- Get current project state
+    SELECT current_phase_id, current_step_id, template_snapshot INTO project_record
+    FROM projects WHERE project_id = p_project_id;
+
+    IF project_record.template_snapshot IS NULL THEN
+        RAISE NOTICE 'No template snapshot found for project %', p_project_id;
+        RETURN FALSE;
+    END IF;
+
+    -- Check if tasks are already loaded
+    IF EXISTS (
+        SELECT 1 FROM project_tasks 
+        WHERE project_id = p_project_id 
+        AND is_loaded = true 
+        AND is_archived = false
+    ) THEN
+        RAISE NOTICE 'Project % already has loaded tasks', p_project_id;
+        RETURN FALSE;
+    END IF;
+
+    RAISE NOTICE 'Loading all tasks for project %', p_project_id;
+
+    -- Load all tasks from all phases and steps
+    FOR phase_data IN 
+        SELECT value as phase FROM jsonb_array_elements(project_record.template_snapshot->'phases')
+        ORDER BY (value->'phase'->>'phase_order')::INTEGER
+    LOOP
+        -- Loop through all steps in this phase
+        FOR step_data IN 
+            SELECT value as step FROM jsonb_array_elements(phase_data->'steps')
+            ORDER BY (value->'step'->>'step_order')::INTEGER
+        LOOP
+            -- Load all tasks in this step, respecting parent-child relationships
+            FOR task_data IN 
+                SELECT value as task FROM jsonb_array_elements(step_data->'tasks')
+                ORDER BY (value->>'task_order')::INTEGER
+            LOOP
+                -- Handle parent task relationship
+                parent_task_id := NULL;
+                template_parent_id := (task_data->>'parent_task_id')::UUID;
+                
+                IF template_parent_id IS NOT NULL THEN
+                    -- Find the corresponding parent task in project_tasks
+                    SELECT project_task_id INTO parent_task_id
+                    FROM project_tasks
+                    WHERE project_id = p_project_id 
+                    AND template_task_id = template_parent_id;
+                END IF;
+
+                INSERT INTO project_tasks (
+                    project_id, template_task_id, task_name, task_description,
+                    phase_name, phase_order, step_name, step_order, task_order,
+                    estimated_days, parent_task_id, category, checklist_items,
+                    is_loaded, created_by
+                ) VALUES (
+                    p_project_id,
+                    (task_data->>'task_id')::UUID,
+                    task_data->>'task_name',
+                    task_data->>'description',
+                    phase_data->'phase'->>'phase_name',
+                    (phase_data->'phase'->>'phase_order')::INTEGER,
+                    step_data->'step'->>'step_name',
+                    (step_data->'step'->>'step_order')::INTEGER,
+                    (task_data->>'task_order')::INTEGER,
+                    (task_data->>'estimated_days')::INTEGER,
+                    parent_task_id,
+                    (task_data->>'category')::task_category_type,
+                    COALESCE(task_data->'checklist_items', '[]'::jsonb),
+                    TRUE,
+                    'system'
+                );
+                
+                tasks_loaded := tasks_loaded + 1;
+            END LOOP;
+        END LOOP;
+    END LOOP;
+
+    -- Update project current phase to first phase
+    UPDATE projects 
+    SET current_phase_id = gen_random_uuid(), -- Placeholder, could be improved
+        updated_at = NOW()
+    WHERE project_id = p_project_id;
+
+    -- Initialize task execution order for all loaded tasks
+    PERFORM initialize_task_execution_order_all_phases(p_project_id);
+    
+    -- Auto-assign crew to tasks based on template role assignments
+    PERFORM auto_assign_crew_to_loaded_tasks(p_project_id);
+
+    RAISE NOTICE 'Successfully loaded % tasks from all phases in project %', tasks_loaded, p_project_id;
+    RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to initialize task statuses for all phases
+CREATE OR REPLACE FUNCTION initialize_task_execution_order_all_phases(p_project_id UUID)
+RETURNS VOID AS $$
+DECLARE
+    task_record RECORD;
+    first_phase_order INTEGER;
+BEGIN
+    -- Reset all loaded tasks to pending first
+    UPDATE project_tasks 
+    SET task_status = 'pending', updated_at = NOW()
+    WHERE project_id = p_project_id 
+    AND is_loaded = true 
+    AND task_status != 'completed';
+    
+    -- Get the first phase order
+    SELECT MIN(phase_order) INTO first_phase_order
+    FROM project_tasks
+    WHERE project_id = p_project_id
+    AND is_loaded = true;
+    
+    -- Only start tasks from the first phase, first step
+    -- Start tasks that have no parent and are first in order in the first phase
+    FOR task_record IN
+        SELECT project_task_id, phase_order, step_order, task_order
+        FROM project_tasks
+        WHERE project_id = p_project_id
+        AND is_loaded = true
+        AND task_status = 'pending'
+        AND parent_task_id IS NULL
+        AND phase_order = first_phase_order
+        ORDER BY step_order, task_order
+        LIMIT 1 -- Only start the very first task
+    LOOP
+        -- This is the first task in the first step of the first phase, make it ongoing
+        UPDATE project_tasks 
+        SET task_status = 'ongoing',
+            started_at = NOW(),
+            deadline = CASE 
+                WHEN estimated_days IS NOT NULL 
+                THEN NOW() + (estimated_days || ' days')::INTERVAL 
+                ELSE NULL 
+            END,
+            updated_at = NOW()
+        WHERE project_task_id = task_record.project_task_id;
+        
+        RAISE NOTICE 'Task % started as first task in project', task_record.project_task_id;
+        EXIT; -- Only start one task initially
+    END LOOP;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -585,8 +779,8 @@ BEGIN
             SET task_status = 'ongoing',
                 started_at = NOW(),
                 deadline = CASE 
-                    WHEN estimated_hours IS NOT NULL 
-                    THEN NOW() + (estimated_hours || ' hours')::INTERVAL 
+                    WHEN estimated_days IS NOT NULL 
+                    THEN NOW() + (estimated_days || ' days')::INTERVAL 
                     ELSE NULL 
                 END,
                 updated_at = NOW()
@@ -705,8 +899,8 @@ BEGIN
         
         NEW.started_at = NOW();
         -- Calculate deadline based on estimated hours
-        IF NEW.estimated_hours IS NOT NULL THEN
-            NEW.deadline = NOW() + (NEW.estimated_hours || ' hours')::INTERVAL;
+        IF NEW.estimated_days IS NOT NULL THEN
+            NEW.deadline = NOW() + (NEW.estimated_days || ' days')::INTERVAL;
         END IF;
     END IF;
 
@@ -759,8 +953,8 @@ BEGIN
             SET task_status = 'ongoing',
                 started_at = NOW(),
                 deadline = CASE 
-                    WHEN estimated_hours IS NOT NULL 
-                    THEN NOW() + (estimated_hours || ' hours')::INTERVAL 
+                    WHEN estimated_days IS NOT NULL 
+                    THEN NOW() + (estimated_days || ' days')::INTERVAL 
                     ELSE NULL 
                 END,
                 updated_at = NOW()
@@ -1015,7 +1209,7 @@ SELECT
     
     -- Template-based total statistics (complete project scope)
     COALESCE(template_stats.template_total_tasks, 0) as total_tasks,
-    COALESCE(template_stats.template_total_hours, 0) as total_estimated_hours,
+    COALESCE(template_stats.template_total_days, 0) as total_estimated_days,
     
     -- Role statistics
     COALESCE(role_stats.total_roles, 0) as total_roles,
@@ -1047,7 +1241,7 @@ LEFT JOIN (
     SELECT 
         p.project_id,
         COUNT(task_data.*) as template_total_tasks,
-        SUM((task_data->'task'->>'estimated_hours')::INTEGER) as template_total_hours
+        SUM((task_data->'task'->>'estimated_days')::INTEGER) as template_total_days
     FROM projects p,
     LATERAL (
         SELECT value as phase_data

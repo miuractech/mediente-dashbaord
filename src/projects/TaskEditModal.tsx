@@ -13,6 +13,7 @@ import {
   Divider,
   Card,
   Badge,
+  Loader,
 } from '@mantine/core';
 import { DateTimePicker } from '@mantine/dates';
 import { notifications } from '@mantine/notifications';
@@ -32,6 +33,7 @@ import type {
 } from './project.typs';
 import type { ChecklistItem, TaskCategoryType } from '../template/template.type';
 import { useUpdateTask, useAvailableCrew, useAssignCrewToTask, useRemoveCrewFromTask } from './project.hook';
+import { projectService } from './project.service';
 import ChecklistManager from '../template/ChecklistManager';
 
 interface TaskEditModalProps {
@@ -63,6 +65,9 @@ export function TaskEditModal({
   const [formData, setFormData] = useState<UpdateTaskInput>({});
   const [selectedCrewIds, setSelectedCrewIds] = useState<string[]>([]);
   const [deadline, setDeadline] = useState<Date | null>(null);
+  const [parentTaskSearch, setParentTaskSearch] = useState('');
+  const [availableParentTasks, setAvailableParentTasks] = useState<ProjectTaskWithAssignments[]>([]);
+  const [loadingParentTasks, setLoadingParentTasks] = useState(false);
 
   const { updateTask, loading } = useUpdateTask();
   const { crew: availableCrew, loading: crewLoading } = useAvailableCrew();
@@ -72,20 +77,92 @@ export function TaskEditModal({
   // Initialize form when task changes
   useEffect(() => {
     if (task && opened) {
+      console.log('📝 [TaskEditModal] Populating form with task data:', {
+        project_task_id: task.project_task_id,
+        task_name: task.task_name,
+        parent_task_id: task.parent_task_id,
+        task_status: task.task_status,
+        category: task.category,
+        assigned_crew: task.assigned_crew.length
+      });
+      
       setFormData({
         task_name: task.task_name,
         task_description: task.task_description || '',
-        estimated_hours: task.estimated_hours || undefined,
-        actual_hours: task.actual_hours,
+        estimated_days: task.estimated_days || undefined,
+        actual_days: task.actual_days,
         category: task.category || undefined,
         task_status: task.task_status,
         escalation_reason: task.escalation_reason || '',
         checklist_items: task.checklist_items || [],
+        parent_task_id: task.parent_task_id || undefined,
       });
       setSelectedCrewIds(task.assigned_crew.map(crew => crew.crew_id));
       setDeadline(task.deadline ? new Date(task.deadline) : null);
+      
+      console.log('✅ [TaskEditModal] Form data populated successfully');
     }
   }, [task, opened]);
+
+  // Load available parent tasks with search
+  useEffect(() => {
+    const loadParentTasks = async () => {
+      if (!opened || !task) return;
+      
+      console.log('🔍 [TaskEditModal] Starting parent task search...', {
+        opened,
+        taskId: task.project_task_id,
+        projectId: task.project_id,
+        searchTerm: parentTaskSearch.trim(),
+        searchLength: parentTaskSearch.trim().length
+      });
+      
+      try {
+        setLoadingParentTasks(true);
+        
+        // Require minimum 2 characters for search to avoid expensive queries
+        if (parentTaskSearch.trim().length >= 2) {
+          console.log('⚡ [TaskEditModal] Executing project parent task search...');
+          
+          const filters = {
+            project_id: task.project_id,
+            search: parentTaskSearch.trim(),
+            is_archived: false,
+          };
+          
+          console.log('📋 [TaskEditModal] Search filters:', filters);
+          
+          // Get all project tasks and filter out current task and its descendants
+          let availableTasks = await projectService.getProjectTasks(filters);
+          console.log('✅ [TaskEditModal] Raw search results:', availableTasks.length, 'tasks found');
+          
+          // Filter out current task
+          availableTasks = availableTasks.filter(t => t.project_task_id !== task.project_task_id);
+          console.log('🚫 [TaskEditModal] After filtering current task:', availableTasks.length, 'tasks remain');
+          
+          // Limit to 10 results for performance
+          const limitedTasks = availableTasks.slice(0, 10);
+          console.log('📊 [TaskEditModal] Final results (top 10):', limitedTasks.map(t => `${t.task_name} (${t.phase_name} - ${t.step_name})`));
+          
+          setAvailableParentTasks(limitedTasks);
+        } else {
+          console.log('🔍 [TaskEditModal] Search term too short, clearing results');
+          // Clear results when search term is too short
+          setAvailableParentTasks([]);
+        }
+      } catch (error) {
+        console.error('❌ [TaskEditModal] Error loading parent tasks:', error);
+        setAvailableParentTasks([]);
+      } finally {
+        setLoadingParentTasks(false);
+        console.log('🏁 [TaskEditModal] Parent task search completed');
+      }
+    };
+
+    // Debounce the search for better performance
+    const debounceTimer = setTimeout(loadParentTasks, 300);
+    return () => clearTimeout(debounceTimer);
+  }, [opened, task, parentTaskSearch]);
 
   const handleSubmit = async () => {
     if (!task || !formData.task_name?.trim()) {
@@ -153,6 +230,8 @@ export function TaskEditModal({
     setFormData({});
     setSelectedCrewIds([]);
     setDeadline(null);
+    setParentTaskSearch('');
+    setAvailableParentTasks([]);
     onClose();
   };
 
@@ -164,6 +243,12 @@ export function TaskEditModal({
   const crewOptions = availableCrew.map(crew => ({
     value: crew.id,
     label: `${crew.name} (${crew.email})`,
+  }));
+
+  // Convert parent tasks for Select
+  const parentTaskOptions = availableParentTasks.map(task => ({
+    value: task.project_task_id,
+    label: `${task.task_name} (${task.phase_name} - ${task.step_name})`,
   }));
 
   if (!task) return null;
@@ -236,16 +321,16 @@ export function TaskEditModal({
           maxRows={6}
         />
 
-        {/* Hours and Deadline */}
+        {/* Days and Deadline */}
         <Group grow>
           <NumberInput
-            label="Estimated Hours"
+            label="Estimated Days"
             leftSection={<IconClock size={16} />}
-            placeholder="Enter estimated hours"
-            value={formData.estimated_hours}
+            placeholder="Enter estimated days"
+            value={formData.estimated_days}
             onChange={(value) => setFormData(prev => ({ 
               ...prev, 
-              estimated_hours: value as number | undefined 
+              estimated_days: value as number | undefined 
             }))}
             min={0}
             step={0.5}
@@ -253,18 +338,45 @@ export function TaskEditModal({
           />
           
           <NumberInput
-            label="Actual Hours"
+            label="Actual Days"
             leftSection={<IconClock size={16} />}
-            placeholder="Enter actual hours"
-            value={formData.actual_hours}
+            placeholder="Enter actual days"
+            value={formData.actual_days}
             onChange={(value) => setFormData(prev => ({ 
               ...prev, 
-              actual_hours: value as number | undefined 
+              actual_days: value as number | undefined 
             }))}
             min={0}
             step={0.5}
           />
         </Group>
+
+        {/* Parent Task */}
+        <Select
+          label="Parent Task"
+          placeholder={parentTaskSearch.trim().length >= 2 ? "Search results (top 10)..." : "Type at least 2 characters to search..."}
+          value={formData.parent_task_id || ''}
+          onChange={(value) => setFormData(prev => ({ 
+            ...prev, 
+            parent_task_id: value || undefined
+          }))}
+          data={parentTaskOptions}
+          searchable
+          clearable
+          onSearchChange={setParentTaskSearch}
+          searchValue={parentTaskSearch}
+          description="Search for a parent task. Type at least 2 characters to start searching."
+          limit={10}
+          nothingFoundMessage={
+            loadingParentTasks 
+              ? "Searching..." 
+              : parentTaskSearch.trim().length >= 2
+                ? "No matching tasks found. Try different search terms." 
+                : "Type at least 2 characters to search for parent tasks"
+          }
+          rightSection={loadingParentTasks ? <Loader size="xs" /> : undefined}
+          maxDropdownHeight={400}
+        />
 
         {/* Deadline */}
         <DateTimePicker

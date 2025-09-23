@@ -105,7 +105,7 @@ export function TaskListComponent({ projectId, onTaskEdit }: TaskListComponentPr
     const input: CreateCustomTaskInput = {
       task_name: 'New Custom Task',
       task_description: 'Custom task description',
-      estimated_hours: 1,
+      estimated_days: 1,
     };
 
     const task = await createCustomTask(projectId, input);
@@ -447,9 +447,9 @@ export function TaskListComponent({ projectId, onTaskEdit }: TaskListComponentPr
                                             {task.task_status}
                                           </Badge>
                                           
-                                          {task.estimated_hours && (
+                                          {task.estimated_days && (
                                             <Badge size="xs" variant="outline">
-                                              {task.estimated_hours}h
+                                              {task.estimated_days}d
                                             </Badge>
                                           )}
                                           
