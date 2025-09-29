@@ -35,6 +35,7 @@ import {
   IconUnlink,
 } from '@tabler/icons-react';
 import type { StepTask, TaskCategoryType } from './template.type';
+import { InlineRoleAssignment } from './InlineRoleAssignment';
 import supabase from '../supabase';
 
 // Generic sortable item component
@@ -98,6 +99,7 @@ interface SimpleTemplateTasksListProps {
   onCopyTasks?: () => void;
   getRoleName: (roleId?: string) => string;
   templateId: string;
+  onRoleUpdate?: (taskId: string, roleId: string | null) => void;
 }
 
 // Simple template tasks list component - all tasks in order without grouping
@@ -111,6 +113,7 @@ export function SimpleTemplateTasksList({
   onCopyTasks,
   getRoleName,
   templateId,
+  onRoleUpdate,
 }: SimpleTemplateTasksListProps) {
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -354,13 +357,12 @@ export function SimpleTemplateTasksList({
                     </Text>
                   </Table.Td>
                   <Table.Td>
-                    <Badge 
-                      variant="light" 
-                      color={task.assigned_role_id ? 'blue' : 'gray'}
+                    <InlineRoleAssignment
+                      task={task}
+                      currentRoleName={getRoleName(task.assigned_role_id)}
+                      onRoleUpdate={onRoleUpdate || (() => {})}
                       size="sm"
-                    >
-                      {getRoleName(task.assigned_role_id)}
-                    </Badge>
+                    />
                   </Table.Td>
                   <Table.Td>
                     <Text size="sm" c="dimmed" style={{ wordWrap: 'break-word', whiteSpace: 'normal' }}>

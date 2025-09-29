@@ -35,6 +35,7 @@ import {
   IconCopy,
 } from '@tabler/icons-react';
 import type { TemplatePhase, PhaseStep, StepTask, TaskCategoryType } from './template.type';
+import { InlineRoleAssignment } from './InlineRoleAssignment';
 import { useState, useEffect } from 'react';
 import supabase from '../supabase';
 
@@ -383,6 +384,7 @@ interface DraggableTasksListProps {
   onCopyTasks?: () => void;
   getRoleName: (roleId?: string) => string;
   templateId: string; // Add templateId to fetch cross-step parent info
+  onRoleUpdate?: (taskId: string, roleId: string | null) => void;
 }
 
 // Draggable Phase Tasks List (tasks from all steps in a phase)
@@ -395,6 +397,7 @@ interface DraggablePhaseTasksListProps {
   onCopyTasks?: () => void;
   getRoleName: (roleId?: string) => string;
   templateId: string;
+  onRoleUpdate?: (taskId: string, roleId: string | null) => void;
 }
 
 
@@ -407,6 +410,7 @@ export function DraggablePhaseTasksList({
   onCopyTasks,
   getRoleName,
   templateId,
+  onRoleUpdate,
 }: DraggablePhaseTasksListProps) {
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -616,13 +620,12 @@ export function DraggablePhaseTasksList({
                   </Text>
                 </Table.Td>
                 <Table.Td>
-                  <Badge 
-                    variant="light" 
-                    color={task.assigned_role_id ? 'blue' : 'gray'}
+                  <InlineRoleAssignment
+                    task={task}
+                    currentRoleName={getRoleName(task.assigned_role_id)}
+                    onRoleUpdate={onRoleUpdate || (() => {})}
                     size="sm"
-                  >
-                    {getRoleName(task.assigned_role_id)}
-                  </Badge>
+                  />
                 </Table.Td>
                 <Table.Td>
                   <Text size="sm" c="dimmed" style={{ wordWrap: 'break-word', whiteSpace: 'normal' }}>
@@ -688,6 +691,7 @@ export function DraggableTasksList({
   onCopyTasks,
   getRoleName,
   templateId,
+  onRoleUpdate,
 }: DraggableTasksListProps) {
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -896,13 +900,12 @@ export function DraggableTasksList({
                    </Text>
                  </Table.Td>
                  <Table.Td>
-                   <Badge 
-                     variant="light" 
-                     color={task.assigned_role_id ? 'blue' : 'gray'}
+                   <InlineRoleAssignment
+                     task={task}
+                     currentRoleName={getRoleName(task.assigned_role_id)}
+                     onRoleUpdate={onRoleUpdate || (() => {})}
                      size="sm"
-                   >
-                     {getRoleName(task.assigned_role_id)}
-                   </Badge>
+                   />
                  </Table.Td>
                  <Table.Td>
                    <Text size="sm" c="dimmed" style={{ wordWrap: 'break-word', whiteSpace: 'normal' }}>

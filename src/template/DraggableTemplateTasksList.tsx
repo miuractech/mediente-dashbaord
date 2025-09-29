@@ -35,6 +35,7 @@ import {
   IconUnlink,
 } from '@tabler/icons-react';
 import type { StepTask, TaskCategoryType } from './template.type';
+import { InlineRoleAssignment } from './InlineRoleAssignment';
 import supabase from '../supabase';
 
 // Generic sortable item component
@@ -98,6 +99,7 @@ interface DraggableTemplateTasksListProps {
   onCopyTasks?: () => void;
   getRoleName: (roleId?: string) => string;
   templateId: string;
+  onRoleUpdate?: (taskId: string, roleId: string | null) => void;
 }
 
 // Template tasks list component segregated by phases and steps
@@ -111,6 +113,7 @@ export function DraggableTemplateTasksList({
   onCopyTasks,
   getRoleName,
   templateId,
+  onRoleUpdate,
 }: DraggableTemplateTasksListProps) {
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -413,13 +416,12 @@ export function DraggableTemplateTasksList({
                           </Text>
                         </Table.Td>
                         <Table.Td>
-                          <Badge 
-                            variant="light" 
-                            color={task.assigned_role_id ? 'blue' : 'gray'}
+                          <InlineRoleAssignment
+                            task={task}
+                            currentRoleName={getRoleName(task.assigned_role_id)}
+                            onRoleUpdate={onRoleUpdate || (() => {})}
                             size="sm"
-                          >
-                            {getRoleName(task.assigned_role_id)}
-                          </Badge>
+                          />
                         </Table.Td>
                         <Table.Td>
                           <Text size="sm" c="dimmed" style={{ wordWrap: 'break-word', whiteSpace: 'normal' }}>

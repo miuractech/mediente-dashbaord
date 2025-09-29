@@ -24,9 +24,9 @@ import {
   Breadcrumbs,
   Anchor,
   Container,
-  NumberInput,
   Tooltip,
 } from '@mantine/core';
+import { DateTimePicker } from '@mantine/dates';
 import {
   IconArrowLeft,
   IconFile,
@@ -68,7 +68,7 @@ export default function TaskDetailPage() {
   const [editData, setEditData] = useState({
     task_name: '',
     task_description: '',
-    estimated_days: 0,
+    deadline: null as Date | null,
   });
 
   const { crew: availableCrew, loading: crewLoading } = useAvailableCrew(debouncedCrewSearchTerm);
@@ -81,7 +81,7 @@ export default function TaskDetailPage() {
       setEditData({
         task_name: task.task_name,
         task_description: task.task_description || '',
-        estimated_days: task.estimated_days || 0,
+        deadline: task.deadline ? new Date(task.deadline) : null,
       });
     }
   }, [task]);
@@ -175,17 +175,40 @@ export default function TaskDetailPage() {
       setEditData({
         task_name: task.task_name,
         task_description: task.task_description || '',
-        estimated_days: task.estimated_days || 0,
+        deadline: task.deadline ? new Date(task.deadline) : null,
       });
     }
     setEditMode(!editMode);
   };
 
   const handleSaveEdit = async () => {
+    // Handle deadline conversion safely
+    let deadlineValue: string | null = null;
+    if (editData.deadline) {
+      try {
+        // Try to convert to Date first, then to ISO string
+        const dateObj = editData.deadline instanceof Date 
+          ? editData.deadline 
+          : new Date(editData.deadline);
+        
+        if (!isNaN(dateObj.getTime())) {
+          deadlineValue = dateObj.toISOString();
+        }
+      } catch (error) {
+        console.error('Error converting deadline:', error);
+        notifications.show({
+          title: 'Invalid Deadline',
+          message: 'Please select a valid deadline',
+          color: 'red',
+        });
+        return;
+      }
+    }
+
     const success = await updateTask(task.project_task_id, {
       task_name: editData.task_name,
       task_description: editData.task_description || undefined,
-      estimated_days: editData.estimated_days || undefined,
+      deadline: deadlineValue,
     });
     
     if (success) {
@@ -257,14 +280,13 @@ export default function TaskDetailPage() {
                   minRows={2}
                   variant="filled"
                 />
-                <NumberInput
-                  label="Estimated Days"
-                  value={editData.estimated_days}
-                  onChange={(value: string | number) => setEditData(prev => ({ ...prev, estimated_days: Number(value) || 0 }))}
-                  min={0}
-                  step={0.5}
-                  decimalScale={1}
+                <DateTimePicker
+                  label="Deadline"
+                  placeholder="Set deadline for this task"
+                  value={editData.deadline}
+                  onChange={(value) => setEditData(prev => ({ ...prev, deadline: value as Date | null }))}
                   size="sm"
+                  clearable
                 />
               </Stack>
             ) : (
@@ -402,20 +424,23 @@ export default function TaskDetailPage() {
                     Step {task.step_order}: {task.step_name}
                   </Badge>
                 </Group>
+                <Group justify="space-between">
+                  <Text size="sm" c="dimmed">Actual Days:</Text>
+                  <Text size="sm">{task.actual_days}d</Text>
+                </Group>
                 {task.estimated_days && (
                   <Group justify="space-between">
                     <Text size="sm" c="dimmed">Estimated Days:</Text>
                     <Text size="sm">{task.estimated_days}d</Text>
                   </Group>
                 )}
-                <Group justify="space-between">
-                  <Text size="sm" c="dimmed">Actual Days:</Text>
-                  <Text size="sm">{task.actual_days}d</Text>
-                </Group>
                 {task.deadline && (
                   <Group justify="space-between">
                     <Text size="sm" c="dimmed">Deadline:</Text>
-                    <Text size="sm">{new Date(task.deadline).toLocaleDateString()}</Text>
+                    <Text size="sm" c={new Date(task.deadline) < new Date() && task.task_status !== 'completed' ? 'red' : undefined}>
+                      {new Date(task.deadline).toLocaleString()}
+                      {new Date(task.deadline) < new Date() && task.task_status !== 'completed' && ' (Overdue)'}
+                    </Text>
                   </Group>
                 )}
                 {task.started_at && (

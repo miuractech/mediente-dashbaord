@@ -13,6 +13,7 @@ import {
   SegmentedControl,
   Tooltip,
   ScrollArea,
+  Title,
 } from '@mantine/core';
 import {
   IconSearch,
@@ -170,7 +171,7 @@ export function SimpleTaskOverview() {
       {/* Header */}
       <Group justify="space-between">
         <div>
-          <Text size="xl" fw={700}>Task Overview</Text>
+          <Title order={1} fw={700}>Welcome Back, Admin</Title>
           <Text size="md" c="dimmed">Monitor pending, escalated, and overdue tasks across all projects</Text>
         </div>
         <Tooltip label="Refresh tasks">
