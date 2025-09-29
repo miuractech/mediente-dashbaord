@@ -51,7 +51,7 @@ export default function ProjectCrewManagement() {
   const [assignmentModalOpened, setAssignmentModalOpened] = useState(false);
   const [selectedCrewMember, setSelectedCrewMember] = useState<ProjectCrewAssignmentWithDetails | null>(null);
   const [crewDetailModalOpened, setCrewDetailModalOpened] = useState(false);
-  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
+  const [viewMode, setViewMode] = useState<'card' | 'table'>('table');
 
   const { project, loading: projectLoading, error: projectError } = useProject(projectId || null);
   const { roles, loading: rolesLoading, refetch: refetchRoles } = useProjectRoles(projectId || null);

@@ -146,7 +146,7 @@ export default function AdminLayout() {
           
           <NavLink
             label="Dashboard"
-            className='rounded-3xl'
+          
             leftSection={<IconDashboard size="1rem" />}
             active={isActive('/admin/dashboard')}
             onClick={() => navigate('/admin/dashboard')}
@@ -154,7 +154,7 @@ export default function AdminLayout() {
           
           <NavLink
             label="Projects"
-            className='rounded-3xl'
+          
             leftSection={<IconFolder size="1rem" />}
             active={isActive('/admin/projects')}
             onClick={() => navigate('/admin/projects')}
@@ -162,7 +162,7 @@ export default function AdminLayout() {
           
           <NavLink
             label="Calendar"
-            className='rounded-3xl'
+          
             leftSection={<IconCalendar size="1rem" />}
             active={isActive('/admin/calendar')}
             onClick={() => navigate('/admin/calendar')}
@@ -170,7 +170,7 @@ export default function AdminLayout() {
           
           <NavLink
             label="Templates"
-            className='rounded-3xl'
+          
             leftSection={<IconFiles size="1rem" />}
             active={isActive('/admin/templates')}
             onClick={() => navigate('/admin/templates')}
@@ -186,7 +186,7 @@ export default function AdminLayout() {
           
           <NavLink
             label="Departments"
-            className='rounded-3xl'
+          
             leftSection={<IconBuilding size="1rem" />}
             active={isActive('/admin/departments')}
             onClick={() => navigate('/admin/departments')}
@@ -194,7 +194,7 @@ export default function AdminLayout() {
           
           <NavLink
             label="Department Roles"
-            className='rounded-3xl'
+  
             leftSection={<IconHierarchy size="1rem" />}
             active={isActive('/admin/roles')}
             onClick={() => navigate('/admin/roles')}
@@ -210,7 +210,7 @@ export default function AdminLayout() {
           
           <NavLink
             label="Crew"
-            className='rounded-3xl'
+  
             leftSection={<IconSettings2 size="1rem" />}
             active={isActive('/admin/crew')}
             onClick={() => navigate('/admin/crew')}
@@ -221,7 +221,6 @@ export default function AdminLayout() {
           <NavLink
 
             label="Settings"
-            className='rounded-3xl'
             leftSection={<IconSettings size="1rem" />}
             active={isActive('/admin/settings')}
             onClick={() => navigate('/admin/settings')}
@@ -229,7 +228,7 @@ export default function AdminLayout() {
           
           <NavLink
             label="Logout"
-            className='rounded-3xl'
+          
             leftSection={<IconLogout size="1rem" />}
             color="red"
             onClick={handleLogout}

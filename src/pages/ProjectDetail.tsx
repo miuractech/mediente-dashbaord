@@ -88,10 +88,10 @@ export default function ProjectDetail() {
           project.project_status === 'active' && 
           !startingProject) {
         try {
-          console.log('Project has no loaded tasks, attempting to auto-start:', project.project_id);
+          
           const success = await startProject(project.project_id);
           if (success) {
-            console.log('Project auto-started successfully, refreshing data');
+            
             // Refresh project data to get the loaded tasks
             setTimeout(() => {
               handleSilentRefresh();

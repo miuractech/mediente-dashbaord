@@ -32,6 +32,7 @@ import {
   IconPlus,
   IconDots,
   IconCopy,
+  IconUnlink,
 } from '@tabler/icons-react';
 import type { StepTask, TaskCategoryType } from './template.type';
 import supabase from '../supabase';
@@ -93,6 +94,7 @@ interface SimpleTemplateTasksListProps {
   onEdit: (task: StepTask) => void;
   onDelete: (task: StepTask) => void;
   onCreateChild: (parentTaskId: string) => void;
+  onUnlinkParent: (task: StepTask) => void;
   onCopyTasks?: () => void;
   getRoleName: (roleId?: string) => string;
   templateId: string;
@@ -105,6 +107,7 @@ export function SimpleTemplateTasksList({
   onEdit,
   onDelete,
   onCreateChild,
+  onUnlinkParent,
   onCopyTasks,
   getRoleName,
   templateId,
@@ -385,6 +388,15 @@ export function SimpleTemplateTasksList({
                         >
                           Create Child Task
                         </Menu.Item>
+                        {task.parent_task_id && (
+                          <Menu.Item
+                            leftSection={<IconUnlink size={12} />}
+                            onClick={() => onUnlinkParent(task)}
+                            color="orange"
+                          >
+                            Unlink Parent Task
+                          </Menu.Item>
+                        )}
                         {onCopyTasks && (
                           <Menu.Item
                             leftSection={<IconCopy size={12} />}

@@ -219,7 +219,7 @@ class RealtimeService {
 
   cleanupAllSubscriptions(): void {
     this.unsubscribeAll();
-    console.log('All real-time subscriptions cleaned up');
+    
   }
 }
 

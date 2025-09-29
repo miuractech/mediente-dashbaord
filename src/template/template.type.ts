@@ -120,7 +120,7 @@ export interface ProjectTemplate {
     task_order?: number;
     estimated_days?: number;
     assigned_role_id?: string;
-    parent_task_id?: string;
+    parent_task_id?: string | null; // Allow null to remove parent relationship
     category?: TaskCategoryType;
     checklist_items?: ChecklistItem[];
     is_archived?: boolean;

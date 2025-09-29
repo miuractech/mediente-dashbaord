@@ -81,19 +81,14 @@ export function CustomTaskFormDrawer({
     const loadParentTasks = async () => {
       if (!opened) return;
       
-      console.log('🔍 [CustomTaskFormDrawer] Starting parent task search...', {
-        opened,
-        projectId,
-        searchTerm: parentTaskSearch.trim(),
-        searchLength: parentTaskSearch.trim().length
-      });
+      
       
       try {
         setLoadingParentTasks(true);
         
         // Require minimum 2 characters for search to avoid expensive queries
         if (parentTaskSearch.trim().length >= 2) {
-          console.log('⚡ [CustomTaskFormDrawer] Executing project parent task search...');
+          
           
           const filters = {
             project_id: projectId,
@@ -101,19 +96,19 @@ export function CustomTaskFormDrawer({
             is_archived: false,
           };
           
-          console.log('📋 [CustomTaskFormDrawer] Search filters:', filters);
+          
           
           // Get all project tasks
           const availableTasks = await projectService.getProjectTasks(filters);
-          console.log('✅ [CustomTaskFormDrawer] Raw search results:', availableTasks.length, 'tasks found');
+          
           
           // Limit to 10 results for performance
           const limitedTasks = availableTasks.slice(0, 10);
-          console.log('📊 [CustomTaskFormDrawer] Final results (top 10):', limitedTasks.map(t => `${t.task_name} (${t.phase_name} - ${t.step_name})`));
+          
           
           setAvailableParentTasks(limitedTasks);
         } else {
-          console.log('🔍 [CustomTaskFormDrawer] Search term too short, clearing results');
+          
           // Clear results when search term is too short
           setAvailableParentTasks([]);
         }
@@ -122,7 +117,7 @@ export function CustomTaskFormDrawer({
         setAvailableParentTasks([]);
       } finally {
         setLoadingParentTasks(false);
-        console.log('🏁 [CustomTaskFormDrawer] Parent task search completed');
+        
       }
     };
 

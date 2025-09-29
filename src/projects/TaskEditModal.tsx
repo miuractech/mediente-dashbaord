@@ -77,14 +77,7 @@ export function TaskEditModal({
   // Initialize form when task changes
   useEffect(() => {
     if (task && opened) {
-      console.log('📝 [TaskEditModal] Populating form with task data:', {
-        project_task_id: task.project_task_id,
-        task_name: task.task_name,
-        parent_task_id: task.parent_task_id,
-        task_status: task.task_status,
-        category: task.category,
-        assigned_crew: task.assigned_crew.length
-      });
+      
       
       setFormData({
         task_name: task.task_name,
@@ -100,7 +93,7 @@ export function TaskEditModal({
       setSelectedCrewIds(task.assigned_crew.map(crew => crew.crew_id));
       setDeadline(task.deadline ? new Date(task.deadline) : null);
       
-      console.log('✅ [TaskEditModal] Form data populated successfully');
+      
     }
   }, [task, opened]);
 
@@ -109,20 +102,14 @@ export function TaskEditModal({
     const loadParentTasks = async () => {
       if (!opened || !task) return;
       
-      console.log('🔍 [TaskEditModal] Starting parent task search...', {
-        opened,
-        taskId: task.project_task_id,
-        projectId: task.project_id,
-        searchTerm: parentTaskSearch.trim(),
-        searchLength: parentTaskSearch.trim().length
-      });
+      
       
       try {
         setLoadingParentTasks(true);
         
         // Require minimum 2 characters for search to avoid expensive queries
         if (parentTaskSearch.trim().length >= 2) {
-          console.log('⚡ [TaskEditModal] Executing project parent task search...');
+          
           
           const filters = {
             project_id: task.project_id,
@@ -130,23 +117,23 @@ export function TaskEditModal({
             is_archived: false,
           };
           
-          console.log('📋 [TaskEditModal] Search filters:', filters);
+          
           
           // Get all project tasks and filter out current task and its descendants
           let availableTasks = await projectService.getProjectTasks(filters);
-          console.log('✅ [TaskEditModal] Raw search results:', availableTasks.length, 'tasks found');
+          
           
           // Filter out current task
           availableTasks = availableTasks.filter(t => t.project_task_id !== task.project_task_id);
-          console.log('🚫 [TaskEditModal] After filtering current task:', availableTasks.length, 'tasks remain');
+          
           
           // Limit to 10 results for performance
           const limitedTasks = availableTasks.slice(0, 10);
-          console.log('📊 [TaskEditModal] Final results (top 10):', limitedTasks.map(t => `${t.task_name} (${t.phase_name} - ${t.step_name})`));
+          
           
           setAvailableParentTasks(limitedTasks);
         } else {
-          console.log('🔍 [TaskEditModal] Search term too short, clearing results');
+          
           // Clear results when search term is too short
           setAvailableParentTasks([]);
         }
@@ -155,7 +142,7 @@ export function TaskEditModal({
         setAvailableParentTasks([]);
       } finally {
         setLoadingParentTasks(false);
-        console.log('🏁 [TaskEditModal] Parent task search completed');
+        
       }
     };
 

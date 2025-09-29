@@ -310,6 +310,39 @@ export default function TemplatesPage() {
 
   // Copy handlers for legacy support
 
+  const handleUnlinkParent = async (task: StepTask) => {
+    if (!task.parent_task_id) {
+      notifications.show({
+        title: 'Info',
+        message: 'This task has no parent to unlink',
+        color: 'blue'
+      });
+      return;
+    }
+
+    try {
+      
+      await stepTaskService.unlinkParent(task.task_id);
+      
+      notifications.show({
+        title: 'Success',
+        message: `Parent task dependency removed for "${task.task_name}"`,
+        color: 'green'
+      });
+
+      // Refresh the data to show the change
+      await loadData();
+      
+    } catch (error) {
+      console.error('Error unlinking parent task:', error);
+      notifications.show({
+        title: 'Error',
+        message: 'Failed to unlink parent task dependency',
+        color: 'red'
+      });
+    }
+  };
+
   const handleCopyTasks = () => {
     if (path.length === 1 && templateTasks.length > 0) {
       // For template-level copying, we'll copy from the first step that has tasks
@@ -725,6 +758,7 @@ export default function TemplatesPage() {
                   onEdit={handleEdit}
                   onDelete={handleDelete}
                   onCreateChild={handleCreateChildTask}
+                  onUnlinkParent={handleUnlinkParent}
                   onCopyTasks={handleCopyTasks}
                   getRoleName={getRoleName}
                   templateId={path.length > 0 ? path[0].id : ''}
@@ -736,6 +770,7 @@ export default function TemplatesPage() {
                   onEdit={handleEdit}
                   onDelete={handleDelete}
                   onCreateChild={handleCreateChildTask}
+                  onUnlinkParent={handleUnlinkParent}
                   onCopyTasks={handleCopyTasks}
                   getRoleName={getRoleName}
                   templateId={path.length > 0 ? path[0].id : ''}

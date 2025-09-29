@@ -687,7 +687,7 @@ export const stepTaskService = {
     }
 
     const templateId = stepData.template_phases.template_id;
-    console.log('📝 [stepTaskService.create] Creating task for template:', templateId);
+    
 
     // Get next template-wide order number to satisfy unique constraint
     const { data: existingTasks } = await supabase
@@ -706,7 +706,7 @@ export const stepTaskService = {
       ? existingTasks[0].task_order + 1 
       : 1;
 
-    console.log('📊 [stepTaskService.create] Calculated next task order:', nextOrder, 'for template:', templateId);
+    
 
     const { data, error } = await supabase
       .from('step_tasks')
@@ -723,7 +723,7 @@ export const stepTaskService = {
       throw error;
     }
     
-    console.log('✅ [stepTaskService.create] Task created successfully with order:', data.task_order);
+    
     return data;
   },
 
@@ -753,13 +753,39 @@ export const stepTaskService = {
 
     const { error } = await supabase
       .from('step_tasks')
-      .update({
+      .update({ 
         is_archived: true,
         updated_by: user.email || user.id
       })
       .eq('task_id', taskId);
 
     if (error) throw error;
+  },
+
+  // Unlink parent task dependency
+  async unlinkParent(taskId: string): Promise<StepTask> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    
+
+    const { data, error } = await supabase
+      .from('step_tasks')
+      .update({
+        parent_task_id: null,
+        updated_by: user.email || user.id
+      })
+      .eq('task_id', taskId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('❌ [stepTaskService.unlinkParent] Error:', error);
+      throw error;
+    }
+
+    
+    return data;
   },
 
   // Reorder tasks
@@ -1231,15 +1257,10 @@ export const stepTaskService = {
     excludeTaskId?: string,
     limit: number = 10
   ): Promise<(StepTask & { step_name: string; phase_name: string; phase_order: number; step_order: number })[]> {
-    console.log('🔍 [stepTaskService.searchTemplateWideTasks] Starting template-wide search:', {
-      templateId,
-      searchTerm,
-      excludeTaskId,
-      limit
-    });
+    
 
-    // Search across all tasks in the template with step and phase context
-    const { data, error } = await supabase
+    // Build query for searching across all tasks in the template with step and phase context
+    let query = supabase
       .from('step_tasks')
       .select(`
         *,
@@ -1254,8 +1275,14 @@ export const stepTaskService = {
         )
       `)
       .eq('phase_steps.template_phases.template_id', templateId)
-      .eq('is_archived', false)
-      .ilike('task_name', `%${searchTerm}%`)
+      .eq('is_archived', false);
+
+    // Only add search filter if searchTerm is provided
+    if (searchTerm.trim()) {
+      query = query.ilike('task_name', `%${searchTerm}%`);
+    }
+
+    const { data, error } = await query
       .order('task_order', { ascending: true })
       .limit(limit);
 
@@ -1270,8 +1297,8 @@ export const stepTaskService = {
       throw error;
     }
 
-    console.log('✅ [stepTaskService.searchTemplateWideTasks] Raw query results:', data?.length || 0, 'tasks');
-    console.log('🔍 [stepTaskService.searchTemplateWideTasks] Sample data structure:', data?.[0]);
+    
+    
 
     if (!data) return [];
 
@@ -1296,8 +1323,8 @@ export const stepTaskService = {
       return a.task_order - b.task_order;
     });
 
-    console.log('📋 [stepTaskService.searchTemplateWideTasks] Processed results:', flatTasks.length, 'tasks');
-    console.log('📊 [stepTaskService.searchTemplateWideTasks] Task list:', flatTasks.map(t => `${t.task_name} (${t.step_name} - ${t.phase_name})`));
+    
+    
 
     return flatTasks;
   }

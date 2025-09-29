@@ -154,7 +154,7 @@ export default function AdminCallSheet() {
         callSheetService.getExpiredCallSheets(1, 0), // Just get count
       ]);
       
-      console.log('Tab counts loaded:', { recent: recentResponse.total, expired: expiredResponse.total });
+      
       setRecentCount(recentResponse.total);
       setExpiredCount(expiredResponse.total);
     } catch (error) {

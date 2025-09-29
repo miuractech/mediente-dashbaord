@@ -388,19 +388,19 @@ function GanttView() {
   });
 
   const handleTaskChange = (task: Task) => {
-    console.log('Task changed:', task);
+    
   };
 
   const handleTaskDelete = (task: Task) => {
-    console.log('Task deleted:', task);
+    
   };
 
   const handleProgressChange = (task: Task) => {
-    console.log('Progress changed:', task);
+    
   };
 
   const handleDblClick = (task: Task) => {
-    console.log('Task double clicked:', task);
+    
   };
 
   return (

@@ -65,9 +65,9 @@ BEGIN
             created_by_user
         FROM phase_steps ps
         WHERE ps.phase_id = ANY(
-            SELECT phase_id 
-            FROM template_phases 
-            WHERE template_id = source_template_id AND is_archived = false
+            SELECT tp.phase_id 
+            FROM template_phases tp
+            WHERE tp.template_id = source_template_id AND tp.is_archived = false
         )
         AND ps.is_archived = false
         ORDER BY ps.phase_id, ps.step_order
@@ -77,9 +77,9 @@ BEGIN
         SELECT ps.step_id, ps.step_order, ps.phase_id
         FROM phase_steps ps
         WHERE ps.phase_id = ANY(
-            SELECT phase_id 
-            FROM template_phases 
-            WHERE template_id = source_template_id AND is_archived = false
+            SELECT tp.phase_id 
+            FROM template_phases tp
+            WHERE tp.template_id = source_template_id AND tp.is_archived = false
         )
         AND ps.is_archived = false
     )
@@ -91,7 +91,7 @@ BEGIN
 
     -- Batch copy tasks (most efficient part)
     INSERT INTO step_tasks (
-        step_id, task_name, description, task_order, estimated_hours,
+        step_id, task_name, description, task_order, estimated_days,
         assigned_role_id, category, checklist_items, created_by
     )
     SELECT 
@@ -99,7 +99,7 @@ BEGIN
         st.task_name,
         st.description,
         st.task_order,
-        st.estimated_hours,
+        st.estimated_days,
         st.assigned_role_id,
         st.category,
         st.checklist_items,
@@ -109,9 +109,9 @@ BEGIN
         SELECT ps.step_id 
         FROM phase_steps ps
         WHERE ps.phase_id = ANY(
-            SELECT phase_id 
-            FROM template_phases 
-            WHERE template_id = source_template_id AND is_archived = false
+            SELECT tp.phase_id 
+            FROM template_phases tp
+            WHERE tp.template_id = source_template_id AND tp.is_archived = false
         )
         AND ps.is_archived = false
     )
@@ -132,9 +132,9 @@ BEGIN
             SELECT ps.step_id 
             FROM phase_steps ps
             WHERE ps.phase_id = ANY(
-                SELECT phase_id 
-                FROM template_phases 
-                WHERE template_id = source_template_id AND is_archived = false
+                SELECT tp.phase_id 
+                FROM template_phases tp
+                WHERE tp.template_id = source_template_id AND tp.is_archived = false
             )
             AND ps.is_archived = false
         )
@@ -159,6 +159,9 @@ BEGIN
     RETURN new_template_id;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Drop existing function first to handle return type changes
+DROP FUNCTION IF EXISTS get_template_complexity(UUID);
 
 -- Create function to get template complexity before duplication
 CREATE OR REPLACE FUNCTION get_template_complexity(template_uuid UUID)

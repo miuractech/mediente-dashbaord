@@ -102,7 +102,7 @@ export default function AdminLogin() {
 
       const response = await authService.login(values);
 
-      console.log(response.error);
+      
       if (response.error) {
         // Log failed attempt
         await authService.logFailedAttempt(values.email);

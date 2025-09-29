@@ -559,7 +559,7 @@ export class CallSheetService {
       const today = now.toISOString().split('T')[0];
       const currentTime = now.toTimeString().split(' ')[0].substring(0, 5); // HH:MM format
 
-      console.log('Expired query params:', { today, currentTime });
+      
 
       // Skip status update to prevent infinite loops
       // await this.updateExpiredStatuses();
@@ -611,7 +611,7 @@ export class CallSheetService {
       const has_more = offset + limit < total;
       const total_pages = Math.ceil(total / limit);
 
-      console.log('Expired call sheets result:', { total, dataCount: dataResult.data?.length });
+      
 
       return {
         data: dataResult.data || [],
