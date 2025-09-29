@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from "react";
 import {
   AppShell,
   Burger,
@@ -9,14 +9,12 @@ import {
   Avatar,
   Menu,
   Box,
-  Center,
-  Loader,
-} from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
-import { notifications } from '@mantine/notifications';
-import { 
-  IconDashboard, 
-  IconSettings, 
+} from "@mantine/core";
+import { useDisclosure } from "@mantine/hooks";
+import { notifications } from "@mantine/notifications";
+import {
+  IconDashboard,
+  IconSettings,
   IconLogout,
   IconUser,
   IconChevronDown,
@@ -24,69 +22,37 @@ import {
   IconCalendar,
   IconFiles,
   IconBuilding,
-
   IconSettings2,
   IconClipboardList,
-  IconHierarchy
-} from '@tabler/icons-react';
-import { useNavigate, useLocation, Outlet } from 'react-router-dom';
-import authService from './authService';
-import type { AdminUser } from './auth';
-
+  IconHierarchy,
+} from "@tabler/icons-react";
+import { useNavigate, useLocation, Outlet } from "react-router-dom";
+import { useAuth } from "./useAuth";
 
 export default function AdminLayout() {
   const [opened, { toggle }] = useDisclosure();
-  const [user, setUser] = useState<AdminUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const loadCurrentUser = useCallback(async () => {
+  const handleLogout = useCallback(async () => {
     try {
-      const currentUser = await authService.getCurrentUser();
-      if (!currentUser) {
-        navigate('/admin/login');
-        return;
-      }
-      setUser(currentUser);
-    } catch (error) {
-      console.error('Failed to load user:', error);
-      navigate('/admin/login');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [navigate]);
-
-  useEffect(() => {
-    loadCurrentUser();
-  }, [loadCurrentUser]);
-
-  const handleLogout = async () => {
-    try {
-      await authService.logout();
+      await logout();
       notifications.show({
-        title: 'Logged Out',
-        message: 'You have been successfully logged out.',
-        color: 'blue',
+        title: "Logged Out",
+        message: "You have been successfully logged out.",
+        color: "blue",
       });
-      navigate('/admin/login');
+      navigate("/admin/login");
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error("Logout error:", error);
       notifications.show({
-        title: 'Logout Error',
-        message: 'Failed to logout. Please try again.',
-        color: 'red',
+        title: "Logout Error",
+        message: "Failed to logout. Please try again.",
+        color: "red",
       });
     }
-  };
-
-  if (isLoading) {
-    return (
-      <Center h="100vh" w="100vw">
-        <Loader size="xl" color="blue" />
-      </Center>
-    );
-  }
+  }, [logout, navigate]);
 
   const isActive = (path: string) => {
     return location.pathname === path;
@@ -95,21 +61,31 @@ export default function AdminLayout() {
   return (
     <AppShell
       header={{ height: 60 }}
-      navbar={{ width: 300, breakpoint: 'sm', collapsed: { mobile: !opened } }}
+      navbar={{ width: 300, breakpoint: "sm", collapsed: { mobile: !opened } }}
       padding="md"
     >
       <AppShell.Header>
         <Group h="100%" px="md" justify="space-between">
           <Group>
-            <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
+            <Burger
+              opened={opened}
+              onClick={toggle}
+              hiddenFrom="sm"
+              size="sm"
+            />
             <Group gap="xs">
-              <Text size="xl" fw={700} c="blue">MEDIENTE</Text>
+              <Text size="xl" fw={700} c="blue">
+                MEDIENTE
+              </Text>
             </Group>
           </Group>
 
           <Menu shadow="md" width={200}>
             <Menu.Target>
-              <Button variant="subtle" rightSection={<IconChevronDown size={16} />}>
+              <Button
+                variant="subtle"
+                rightSection={<IconChevronDown size={16} />}
+              >
                 <Group gap="xs">
                   <Avatar size="sm" color="blue">
                     {user?.name.charAt(0).toUpperCase()}
@@ -128,7 +104,7 @@ export default function AdminLayout() {
                 Settings
               </Menu.Item>
               <Menu.Divider />
-              <Menu.Item 
+              <Menu.Item
                 leftSection={<IconLogout size={14} />}
                 color="red"
                 onClick={handleLogout}
@@ -142,94 +118,95 @@ export default function AdminLayout() {
 
       <AppShell.Navbar p="md">
         <Box mb="xl">
-          <Text size="sm" c="dimmed" mb="md">Navigation</Text>
-          
+          <Text size="sm" c="dimmed" mb="md">
+            Navigation
+          </Text>
+
           <NavLink
             label="Dashboard"
-            className='rounded-3xl'
+            className="rounded-lg"
             leftSection={<IconDashboard size="1rem" />}
-            active={isActive('/admin/dashboard')}
-            onClick={() => navigate('/admin/dashboard')}
+            active={isActive("/admin/dashboard")}
+            onClick={() => navigate("/admin/dashboard")}
           />
-          
+
           <NavLink
             label="Projects"
-            className='rounded-3xl'
+            className="rounded-lg"
             leftSection={<IconFolder size="1rem" />}
-            active={isActive('/admin/projects')}
-            onClick={() => navigate('/admin/projects')}
+            active={isActive("/admin/projects")}
+            onClick={() => navigate("/admin/projects")}
           />
-          
+
           <NavLink
             label="Calendar"
-            className='rounded-3xl'
+            className="rounded-lg"
             leftSection={<IconCalendar size="1rem" />}
-            active={isActive('/admin/calendar')}
-            onClick={() => navigate('/admin/calendar')}
+            active={isActive("/admin/calendar")}
+            onClick={() => navigate("/admin/calendar")}
           />
-          
+
           <NavLink
             label="Templates"
-            className='rounded-3xl'
+            className="rounded-lg"
             leftSection={<IconFiles size="1rem" />}
-            active={isActive('/admin/templates')}
-            onClick={() => navigate('/admin/templates')}
+            active={isActive("/admin/templates")}
+            onClick={() => navigate("/admin/templates")}
           />
-          
+
           <NavLink
             label="Call Sheet"
-            className='rounded-3xl'
+            className="rounded-lg"
             leftSection={<IconClipboardList size="1rem" />}
-            active={isActive('/admin/callsheet')}
-            onClick={() => navigate('/admin/callsheet')}
+            active={isActive("/admin/callsheet")}
+            onClick={() => navigate("/admin/callsheet")}
           />
-          
+
           <NavLink
             label="Departments"
-            className='rounded-3xl'
+            className="rounded-lg"
             leftSection={<IconBuilding size="1rem" />}
-            active={isActive('/admin/departments')}
-            onClick={() => navigate('/admin/departments')}
+            active={isActive("/admin/departments")}
+            onClick={() => navigate("/admin/departments")}
           />
-          
+
           <NavLink
             label="Department Roles"
-            className='rounded-3xl'
+            className="rounded-lg"
             leftSection={<IconHierarchy size="1rem" />}
-            active={isActive('/admin/roles')}
-            onClick={() => navigate('/admin/roles')}
+            active={isActive("/admin/roles")}
+            onClick={() => navigate("/admin/roles")}
           />
-{/*           
+          {/*           
           <NavLink
             label="Teams"
-            className='rounded-3xl'
+              className='rounded-lg'
             leftSection={<IconUsersGroup size="1rem" />}
             active={isActive('/admin/teams')}
             onClick={() => navigate('/admin/teams')}
           /> */}
-          
+
           <NavLink
             label="Crew"
-            className='rounded-3xl'
+            className="rounded-lg"
             leftSection={<IconSettings2 size="1rem" />}
-            active={isActive('/admin/crew')}
-            onClick={() => navigate('/admin/crew')}
+            active={isActive("/admin/crew")}
+            onClick={() => navigate("/admin/crew")}
           />
         </Box>
 
         <Box mt="auto">
           <NavLink
-
             label="Settings"
-            className='rounded-3xl'
+            className="rounded-lg"
             leftSection={<IconSettings size="1rem" />}
-            active={isActive('/admin/settings')}
-            onClick={() => navigate('/admin/settings')}
+            active={isActive("/admin/settings")}
+            onClick={() => navigate("/admin/settings")}
           />
-          
+
           <NavLink
             label="Logout"
-            className='rounded-3xl'
+            className="rounded-lg"
             leftSection={<IconLogout size="1rem" />}
             color="red"
             onClick={handleLogout}
@@ -237,7 +214,12 @@ export default function AdminLayout() {
         </Box>
       </AppShell.Navbar>
 
-      <AppShell.Main>
+      <AppShell.Main
+        style={{
+          backgroundColor: "#FAF9FF",
+          borderRadius: "40px",
+        }}
+      >
         <Outlet />
       </AppShell.Main>
     </AppShell>

@@ -533,6 +533,44 @@ export default function TemplatesPage() {
     openTaskModal();
   };
 
+  const handleRoleUpdate = useCallback(async (taskId: string, roleId: string | null) => {
+    // Optimistically update the UI for different views
+    if (path.length === 1) {
+      // Template tasks view
+      setTemplateTasks(prev => prev.map(task => 
+        task.task_id === taskId 
+          ? { ...task, assigned_role_id: roleId || undefined }
+          : task
+      ));
+    } else if (path.length === 2) {
+      // Phase tasks view
+      setPhaseTasks(prev => prev.map(task => 
+        task.task_id === taskId 
+          ? { ...task, assigned_role_id: roleId || undefined }
+          : task
+      ));
+    } else if (path.length === 3) {
+      // Step tasks view
+      setTasks(prev => prev.map(task => 
+        task.task_id === taskId 
+          ? { ...task, assigned_role_id: roleId || undefined }
+          : task
+      ));
+    }
+
+    // Update template roles if needed
+    if (path.length === 1) {
+      // Refresh template roles to show updated usage counts
+      try {
+        const templateId = path[0].id;
+        const updatedTemplateRoles = await templateRoleUsageService.getTemplateRoles(templateId);
+        setTemplateRoles(updatedTemplateRoles);
+      } catch (error) {
+        console.error('Error refreshing template roles:', error);
+      }
+    }
+  }, [path]);
+
   const getCurrentParentId = () => {
     if (path.length === 1) {
       // Phases view - need template ID
@@ -728,6 +766,7 @@ export default function TemplatesPage() {
                   onCopyTasks={handleCopyTasks}
                   getRoleName={getRoleName}
                   templateId={path.length > 0 ? path[0].id : ''}
+                  onRoleUpdate={handleRoleUpdate}
                 />
               ) : (
                 <DraggableTemplateTasksList
@@ -739,6 +778,7 @@ export default function TemplatesPage() {
                   onCopyTasks={handleCopyTasks}
                   getRoleName={getRoleName}
                   templateId={path.length > 0 ? path[0].id : ''}
+                  onRoleUpdate={handleRoleUpdate}
                 />
               )}
             </Stack>
@@ -834,6 +874,7 @@ export default function TemplatesPage() {
             onCopyTasks={handleCopyTasks}
             getRoleName={getRoleName}
             templateId={path.length > 0 ? path[0].id : ''}
+            onRoleUpdate={handleRoleUpdate}
           />
         )}
       </Stack>
@@ -868,6 +909,7 @@ export default function TemplatesPage() {
             onCopyTasks={handleCopyTasks}
             getRoleName={getRoleName}
             templateId={path.length > 0 ? path[0].id : ''}
+            onRoleUpdate={handleRoleUpdate}
           />
         )}
       </Stack>

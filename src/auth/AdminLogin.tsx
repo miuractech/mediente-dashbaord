@@ -27,8 +27,9 @@ import {
 import MedienteLogo from "../assets/Mediente-Logo.png";
 import LandingImage from "../assets/landing.jpg";
 import "./AdminLogin.css";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import authService from "./authService";
+import { useAuth } from "./useAuth";
 import type { LoginCredentials } from "./auth";
 
 export default function AdminLogin() {  
@@ -37,6 +38,8 @@ export default function AdminLogin() {
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [isBlocked, setIsBlocked] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const { login } = useAuth();
   const loginForm = useForm<LoginCredentials>({
     initialValues: {
       email: "",
@@ -100,7 +103,7 @@ export default function AdminLogin() {
         return;
       }
 
-      const response = await authService.login(values);
+      const response = await login(values);
 
       console.log(response.error);
       if (response.error) {
@@ -137,10 +140,12 @@ export default function AdminLogin() {
           icon: <IconCheck />,
         });
 
-        // Redirect to admin dashboard
-        navigate("/admin/dashboard");
         // Clear any lingering errors on success
         loginForm.setErrors({});
+        
+        // Redirect to intended destination or dashboard
+        const from = location.state?.from || "/admin/dashboard";
+        navigate(from, { replace: true });
       }
     } catch (err) {
       console.error("Login error:", err);

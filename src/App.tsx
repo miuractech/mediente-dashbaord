@@ -9,6 +9,8 @@ import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
 import '@mantine/dates/styles.css';
 import { AuthProvider } from './auth/AuthContexttype';
+import ProtectedRoute from './auth/ProtectedRoute';
+import PublicRoute from './auth/PublicRoute';
 
 // Lazy load components
 const AdminLogin = lazy(() => import('./auth/AdminLogin'));
@@ -37,8 +39,14 @@ const LoadingFallback = () => (
     <Loader size="lg" />
   </Center>
 );
-
+Date.prototype.toLocaleString = function() {
+  return new Intl.DateTimeFormat('en-IN', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  }).format(this);
+};
 function App() {
+
   // Cleanup real-time subscriptions when app unmounts
   useEffect(() => {
     return () => {
@@ -55,9 +63,26 @@ function App() {
             <Routes>
               {/* Redirect root to admin login */}
               <Route path="/" element={<Navigate to="/admin/login" replace />} />
-              {/* Admin routes */}
-              <Route path="/admin/login" element={<AdminLogin />} />
-              <Route path="/admin" element={<AdminLayout />}>
+              
+              {/* Public routes - redirect to dashboard if already authenticated */}
+              <Route 
+                path="/admin/login" 
+                element={
+                  <PublicRoute>
+                    <AdminLogin />
+                  </PublicRoute>
+                } 
+              />
+              
+              {/* Protected admin routes */}
+              <Route 
+                path="/admin" 
+                element={
+                  <ProtectedRoute>
+                    <AdminLayout />
+                  </ProtectedRoute>
+                }
+              >
                 <Route path="dashboard" element={<Dashboard />} />
                 <Route path="users" element={<AdminUserManagement />} />
                 <Route path="projects" element={<Projects />} />
@@ -83,7 +108,8 @@ function App() {
                 <Route path="calendar" element={<Calendar />} />
                 <Route path="settings" element={<AdminSettings />} />
               </Route>
-              {/* Catch all route */}
+              
+              {/* Catch all route - redirect to login if not authenticated */}
               <Route path="*" element={<Navigate to="/admin/login" replace />} />
             </Routes>
           </Suspense>

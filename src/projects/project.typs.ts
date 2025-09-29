@@ -194,6 +194,7 @@ export interface UpdateTaskInput {
   is_manually_escalated?: boolean;
   started_at?: string | null;
   completed_at?: string | null;
+  deadline?: string | null;
   file_attachments?: Array<{ 
     id: string; 
     file_url: string; 
