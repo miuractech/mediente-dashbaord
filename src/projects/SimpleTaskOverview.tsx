@@ -10,10 +10,10 @@ import {
   ActionIcon,
   Loader,
   Center,
-  SegmentedControl,
   Tooltip,
-  ScrollArea,
   Title,
+  Box,
+  Button,
 } from '@mantine/core';
 import {
   IconSearch,
@@ -21,15 +21,14 @@ import {
   IconAlertTriangle,
   IconClock,
   IconEye,
-  IconPlayerPlay,
-  IconCheck,
   IconPlayerPause,
+  IconClipboard,
+  IconPlus,
 } from '@tabler/icons-react';
 import {
   useAllEscalatedTasks,
   useAllOverdueTasks,
   useAllPendingTasks,
-  useUpdateTask,
 } from './project.hook';
 import type { TaskStatusType } from './project.typs';
 import { TaskDrawer } from './TaskDrawer';
@@ -46,7 +45,6 @@ export function SimpleTaskOverview() {
   const { tasks: escalatedTasks, loading: escalatedLoading, refetch: refetchEscalated } = useAllEscalatedTasks();
   const { tasks: overdueTasks, loading: overdueLoading, refetch: refetchOverdue } = useAllOverdueTasks();
   const { tasks: pendingTasks, loading: pendingLoading, refetch: refetchPending } = useAllPendingTasks();
-  const { updateTask } = useUpdateTask();
 
   const currentTasks = useMemo(() => {
     switch (activeView) {
@@ -124,10 +122,6 @@ export function SimpleTaskOverview() {
     setTaskDrawerOpened(true);
   };
 
-  const handleStatusChange = async (taskId: string, newStatus: TaskStatusType) => {
-    await updateTask(taskId, { task_status: newStatus });
-    handleRefresh();
-  };
 
   const getStatusColor = (status: TaskStatusType) => {
     switch (status) {
@@ -171,8 +165,10 @@ export function SimpleTaskOverview() {
       {/* Header */}
       <Group justify="space-between">
         <div>
-          <Title order={1} fw={700}>Welcome Back, Admin</Title>
-          <Text size="md" c="dimmed">Monitor pending, escalated, and overdue tasks across all projects</Text>
+          <Group gap="sm" mb="xs">
+            <IconClipboard size={24} style={{ color: 'var(--mantine-color-primary-6)' }} />
+            <Title order={2} fw={600} c="dark.7">Requires your attention</Title>
+          </Group>
         </div>
         <Tooltip label="Refresh tasks">
           <ActionIcon
@@ -180,6 +176,10 @@ export function SimpleTaskOverview() {
             size="lg"
             onClick={handleRefresh}
             loading={currentLoading}
+            style={{ 
+              background: 'var(--mantine-color-primary-1)',
+              color: 'var(--mantine-color-primary-6)'
+            }}
           >
             <IconRefresh size={20} />
           </ActionIcon>
@@ -187,42 +187,63 @@ export function SimpleTaskOverview() {
       </Group>
 
       {/* View Selector */}
-      <Card withBorder p="md">
-        <SegmentedControl
-          value={activeView}
-          onChange={(value) => setActiveView(value as TaskViewType)}
-          data={[
-            {
-              value: 'escalated',
-              label: (
-                <Group gap="xs">
-                  <IconAlertTriangle size={16} />
-                  <Text>Escalated ({escalatedTasks.length})</Text>
-                </Group>
-              ),
-            },
-            {
-              value: 'overdue',
-              label: (
-                <Group gap="xs">
-                  <IconClock size={16} />
-                  <Text>Overdue ({overdueTasks.length})</Text>
-                </Group>
-              ),
-            },
-            {
-              value: 'pending',
-              label: (
-                <Group gap="xs">
-                  <IconPlayerPause size={16} />
-                  <Text>Pending ({pendingTasks.length})</Text>
-                </Group>
-              ),
-            },
-          ]}
-          fullWidth
-        />
-      </Card>
+      <Box mb="md">
+        <Group gap="md">
+          <Box 
+            onClick={() => setActiveView('escalated')}
+            style={{ 
+              cursor: 'pointer',
+              padding: '12px 16px',
+              borderRadius: '12px',
+              backgroundColor: activeView === 'escalated' ? 'var(--mantine-color-red-0)' : 'white',
+              border: activeView === 'escalated' ? '2px solid var(--mantine-color-red-4)' : '1px solid var(--mantine-color-gray-3)',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <Group gap="xs">
+              <IconAlertTriangle size={16} color="var(--mantine-color-red-6)" />
+              <Text c="red.7" fw={600} size="sm">ESCALATED</Text>
+              <Text c="dimmed" size="sm">• {escalatedTasks.length} tasks</Text>
+            </Group>
+          </Box>
+          
+          <Box 
+            onClick={() => setActiveView('overdue')}
+            style={{ 
+              cursor: 'pointer',
+              padding: '12px 16px',
+              borderRadius: '12px',
+              backgroundColor: activeView === 'overdue' ? 'var(--mantine-color-orange-0)' : 'white',
+              border: activeView === 'overdue' ? '2px solid var(--mantine-color-orange-4)' : '1px solid var(--mantine-color-gray-3)',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <Group gap="xs">
+              <IconClock size={16} color="var(--mantine-color-orange-6)" />
+              <Text c="orange.7" fw={600} size="sm">OVERDUE</Text>
+              <Text c="dimmed" size="sm">• {overdueTasks.length} tasks</Text>
+            </Group>
+          </Box>
+
+          <Box 
+            onClick={() => setActiveView('pending')}
+            style={{ 
+              cursor: 'pointer',
+              padding: '12px 16px',
+              borderRadius: '12px',
+              backgroundColor: activeView === 'pending' ? 'var(--mantine-color-blue-0)' : 'white',
+              border: activeView === 'pending' ? '2px solid var(--mantine-color-blue-4)' : '1px solid var(--mantine-color-gray-3)',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <Group gap="xs">
+              <IconPlayerPause size={16} color="var(--mantine-color-blue-6)" />
+              <Text c="blue.7" fw={600} size="sm">PENDING</Text>
+              <Text c="dimmed" size="sm">• {pendingTasks.length} tasks</Text>
+            </Group>
+          </Box>
+        </Group>
+      </Box>
 
       {/* Filters */}
       <Card withBorder p="md">
@@ -246,122 +267,97 @@ export function SimpleTaskOverview() {
       </Card>
 
       {/* Task List */}
-      <Card withBorder p="md">
-        <Group justify="space-between" mb="md">
-          <Group gap="sm">
-            {getViewIcon(activeView)}
-            <Text fw={600} size="lg" c={getViewColor(activeView)}>
-              {activeView.charAt(0).toUpperCase() + activeView.slice(1)} Tasks
-            </Text>
-            <Badge color={getViewColor(activeView)} variant="light">
-              {filteredTasks.length} tasks
-            </Badge>
-          </Group>
-        </Group>
-
+      <Box>
         {currentLoading ? (
           <Center h={300}>
             <Loader size="lg" />
           </Center>
         ) : filteredTasks.length > 0 ? (
-          <ScrollArea h={600}>
-            <Stack gap="sm">
-              {filteredTasks.map((task) => (
-                <Card key={task.project_task_id} withBorder p="md" radius="sm">
-                  <Group justify="space-between" align="flex-start">
-                    <div style={{ flex: 1 }}>
-                      <Group gap="sm" mb="xs">
-                        <Badge 
-                          color={getStatusColor(task.task_status)} 
-                          variant="light" 
-                          size="sm"
-                          leftSection={getViewIcon(activeView)}
-                        >
-                          {task.task_status.toUpperCase()}
-                        </Badge>
-                        <Text fw={600} size="sm">{task.task_name}</Text>
-                      </Group>
+          <Stack gap="md">
+            {/* Task Section Header */}
+            <Group justify="space-between" align="flex-start" mb="md">
+              <Text fw={600} size="md" c="dark.7">Name</Text>
+              <Group gap="xl">
+                <Text fw={600} size="md" c="dark.7">Priority</Text>
+                <Text fw={600} size="md" c="dark.7">Due date</Text>
+              </Group>
+            </Group>
 
-                      {task.task_description && (
-                        <Text size="xs" c="dimmed" mb="xs" lineClamp={2}>
-                          {task.task_description}
-                        </Text>
-                      )}
+            {filteredTasks.map((task) => (
+              <Group key={task.project_task_id} justify="space-between" align="center" p="md" style={{
+                backgroundColor: 'white',
+                borderRadius: '12px',
+                border: '1px solid var(--mantine-color-gray-2)',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                ':hover': {
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                  transform: 'translateY(-1px)'
+                }
+              }}>
+                <Group gap="md" style={{ flex: 1 }}>
+                  <Box w={4} h={32} bg={getStatusColor(task.task_status)} style={{ borderRadius: '2px' }} />
+                  <Box>
+                    <Text fw={600} size="sm" c="dark.8" mb={2}>
+                      {task.task_name}
+                    </Text>
+                    {task.task_description && (
+                      <Text size="xs" c="dimmed" lineClamp={1}>
+                        {task.task_description}
+                      </Text>
+                    )}
+                  </Box>
+                </Group>
 
-                      <Group gap="md" mb="xs">
-                        <Text size="xs" c="blue" fw={500}>
-                          {task.projects?.project_name || 'Unknown Project'}
-                        </Text>
-                        <Text size="xs" c="dimmed">
-                          Phase {task.phase_order}: {task.phase_name}
-                        </Text>
-                        <Text size="xs" c="dimmed">
-                          Step {task.step_order}: {task.step_name}
-                        </Text>
-                      </Group>
+                <Group gap="xl" align="center">
+                  <Badge 
+                    color={getStatusColor(task.task_status)}
+                    variant="light"
+                    size="sm"
+                    style={{ 
+                      borderRadius: '8px',
+                      fontWeight: 500,
+                      minWidth: '70px',
+                      textAlign: 'center'
+                    }}
+                  >
+                    {task.task_status === 'escalated' ? 'High' : 
+                     task.task_status === 'pending' ? 'Normal' : 
+                     task.task_status === 'ongoing' ? 'Low' : 'Normal'}
+                  </Badge>
+                  
+                  <Text size="sm" c={activeView === 'overdue' ? 'red.7' : 'dark.6'} fw={500} style={{ minWidth: '80px' }}>
+                    {task.deadline ? (
+                      activeView === 'overdue' ? 'Today' :
+                      activeView === 'pending' ? `${Math.ceil((new Date(task.deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days left` :
+                      formatDate(task.deadline)
+                    ) : 'Not set'}
+                  </Text>
+                </Group>
 
-                      <Group gap="md">
-                        {task.started_at && (
-                          <Text size="xs" c="dimmed">
-                            Started: {formatDate(task.started_at)}
-                          </Text>
-                        )}
-                        {task.deadline && (
-                          <Text size="xs" c={activeView === 'overdue' ? 'red' : 'dimmed'}>
-                            Due: {formatDate(task.deadline)}
-                          </Text>
-                        )}
-                        {activeView === 'escalated' && task.escalated_at && (
-                          <Text size="xs" c="red">
-                            Escalated: {formatDate(task.escalated_at)}
-                          </Text>
-                        )}
-                      </Group>
-                    </div>
+                <ActionIcon
+                  variant="subtle"
+                  size="sm"
+                  color="gray"
+                  onClick={() => handleTaskClick(task.project_task_id)}
+                >
+                  <IconEye size={16} />
+                </ActionIcon>
+              </Group>
+            ))}
 
-                    <Group gap="xs">
-                      <Tooltip label="View Details">
-                        <ActionIcon
-                          variant="light"
-                          size="sm"
-                          color="blue"
-                          onClick={() => handleTaskClick(task.project_task_id)}
-                        >
-                          <IconEye size={14} />
-                        </ActionIcon>
-                      </Tooltip>
-                      
-                      {task.task_status !== 'completed' && (
-                        <Tooltip label="Start Task">
-                          <ActionIcon
-                            variant="light"
-                            size="sm"
-                            color="green"
-                            onClick={() => handleStatusChange(task.project_task_id, 'ongoing')}
-                          >
-                            <IconPlayerPlay size={14} />
-                          </ActionIcon>
-                        </Tooltip>
-                      )}
-                      
-                      {task.task_status !== 'completed' && (
-                        <Tooltip label="Mark Complete">
-                          <ActionIcon
-                            variant="light"
-                            size="sm"
-                            color="green"
-                            onClick={() => handleStatusChange(task.project_task_id, 'completed')}
-                          >
-                            <IconCheck size={14} />
-                          </ActionIcon>
-                        </Tooltip>
-                      )}
-                    </Group>
-                  </Group>
-                </Card>
-              ))}
-            </Stack>
-          </ScrollArea>
+            {/* Add Task Button */}
+            <Group justify="flex-start" mt="md">
+              <Button 
+                variant="subtle" 
+                leftSection={<IconPlus size={16} />}
+                c="primary.6"
+                style={{ fontWeight: 500 }}
+              >
+                + Add task
+              </Button>
+            </Group>
+          </Stack>
         ) : (
           <Center h={300}>
             <Stack align="center" gap="sm">
@@ -378,7 +374,7 @@ export function SimpleTaskOverview() {
             </Stack>
           </Center>
         )}
-      </Card>
+      </Box>
 
       {/* Task Details Drawer */}
       <TaskDrawer

@@ -19,7 +19,6 @@ import {
   NumberInput,
   TextInput,
   Avatar,
-  Tooltip,
   Modal,
   SimpleGrid,
   Loader,
@@ -51,7 +50,6 @@ import {
   IconPaperclip,
   IconMessage,
   IconInfoCircle,
-  IconFlag,
   IconHourglass,
 } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
@@ -263,79 +261,84 @@ export function TaskDrawer({ taskId, opened, onClose, onTaskUpdate }: TaskDrawer
       opened={opened}
       onClose={onClose}
       title={
-        <Group justify="space-between" w="100%" py="xs">
-          <Group gap="sm">
-            <IconInfoCircle size={20} color="var(--mantine-color-blue-6)" />
-            <Text fw={600} size="lg">Task Details</Text>
+        <Group justify="space-between" w="100%" py="md">
+          <Group gap="md">
+            <div style={{ 
+              padding: '8px', 
+              borderRadius: '10px', 
+              background: 'var(--mantine-color-primary-1)' 
+            }}>
+              <IconInfoCircle size={20} color="var(--mantine-color-primary-6)" />
+            </div>
+            <div>
+              <Text fw={700} size="lg" c="dark.8">Task Details</Text>
+              <Text size="sm" c="dimmed">Complete task information and actions</Text>
+            </div>
           </Group>
-          <Group gap="sm">
+          <Group gap="xs">
             {/* Quick Status Actions */}
             {task.task_status === 'pending' && (
-              <Tooltip label="Start Task">
-                <ActionIcon
-                  variant="light"
-                  size="md"
-                  color="blue"
-                  onClick={() => handleQuickStatusChange('ongoing')}
-                >
-                  <IconPlayerPlay size={16} />
-                </ActionIcon>
-              </Tooltip>
+              <Button
+                size="xs"
+                variant="light"
+                color="primary"
+                leftSection={<IconPlayerPlay size={14} />}
+                onClick={() => handleQuickStatusChange('ongoing')}
+                style={{ borderRadius: '8px' }}
+              >
+                Start
+              </Button>
             )}
             
             {task.task_status === 'ongoing' && (
-              <>
-                <Tooltip label="Complete Task">
-                  <ActionIcon
-                    variant="light"
-                    size="md"
-                    color="green"
-                    onClick={() => handleQuickStatusChange('completed')}
-                  >
-                    <IconCheck size={16} />
-                  </ActionIcon>
-                </Tooltip>
-              </>
+              <Button
+                size="xs"
+                variant="light"
+                color="green"
+                leftSection={<IconCheck size={14} />}
+                onClick={() => handleQuickStatusChange('completed')}
+                style={{ borderRadius: '8px' }}
+              >
+                Complete
+              </Button>
             )}
             
             {task.task_status === 'completed' && (
-              <Tooltip label="Reopen Task">
-                <ActionIcon
-                  variant="light"
-                  size="md"
-                  color="blue"
-                  onClick={() => handleQuickStatusChange('ongoing')}
-                >
-                  <IconRestore size={16} />
-                </ActionIcon>
-              </Tooltip>
+              <Button
+                size="xs"
+                variant="light"
+                color="blue"
+                leftSection={<IconRestore size={14} />}
+                onClick={() => handleQuickStatusChange('ongoing')}
+                style={{ borderRadius: '8px' }}
+              >
+                Reopen
+              </Button>
             )}
 
             {/* Edit Toggle */}
-            <Tooltip label={editMode ? "Cancel Edit" : "Edit Task"}>
-              <ActionIcon
-                variant={editMode ? "filled" : "light"}
-                size="md"
-                color={editMode ? "red" : "blue"}
-                onClick={handleEditToggle}
-              >
-                {editMode ? <IconX size={16} /> : <IconEdit size={16} />}
-              </ActionIcon>
-            </Tooltip>
+            <ActionIcon
+              variant={editMode ? "filled" : "light"}
+              size="lg"
+              color={editMode ? "red" : "primary"}
+              onClick={handleEditToggle}
+              style={{ borderRadius: '10px' }}
+            >
+              {editMode ? <IconX size={18} /> : <IconEdit size={18} />}
+            </ActionIcon>
 
             {/* Save Button (only in edit mode) */}
             {editMode && (
-              <Tooltip label="Save Changes">
-                <ActionIcon
-                  variant="filled"
-                  size="md"
-                  color="green"
-                  onClick={handleSaveEdit}
-                  loading={updating}
-                >
-                  <IconDeviceFloppy size={16} />
-                </ActionIcon>
-              </Tooltip>
+              <ActionIcon
+                variant="filled"
+                size="lg"
+                color="green"
+                onClick={handleSaveEdit}
+                loading={updating}
+                style={{ borderRadius: '10px' }}
+              >
+                <IconDeviceFloppy size={18} />
+              </ActionIcon>
             )}
 
           </Group>
@@ -344,10 +347,29 @@ export function TaskDrawer({ taskId, opened, onClose, onTaskUpdate }: TaskDrawer
       position="right"
       size="lg"
       scrollAreaComponent={ScrollArea.Autosize}
+      styles={{
+        header: {
+          borderBottom: '1px solid var(--mantine-color-gray-2)',
+          paddingBottom: '16px',
+        },
+        body: {
+          background: '#fafafa',
+          padding: '24px',
+        },
+      }}
     >
       <Stack gap="xl">
         {/* Task Header */}
-        <Card withBorder p="xl" radius="md">
+        <Card 
+          withBorder={false} 
+          p="xl" 
+          radius="lg"
+          style={{ 
+            background: 'white',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+            border: '1px solid var(--mantine-color-gray-1)'
+          }}
+        >
           {editMode ? (
             <Stack gap="lg">
               <TextInput
@@ -356,6 +378,10 @@ export function TaskDrawer({ taskId, opened, onClose, onTaskUpdate }: TaskDrawer
                 onChange={(e) => setEditData(prev => ({ ...prev, task_name: e.target.value }))}
                 size="md"
                 leftSection={<IconTarget size={18} />}
+                styles={{
+                  input: { borderRadius: '12px', border: '1px solid var(--mantine-color-gray-2)' },
+                  label: { fontWeight: 600, color: 'var(--mantine-color-dark-6)' }
+                }}
               />
               <Textarea
                 label="Description"
@@ -364,6 +390,10 @@ export function TaskDrawer({ taskId, opened, onClose, onTaskUpdate }: TaskDrawer
                 minRows={3}
                 size="md"
                 leftSection={<IconMessage size={18} />}
+                styles={{
+                  input: { borderRadius: '12px', border: '1px solid var(--mantine-color-gray-2)' },
+                  label: { fontWeight: 600, color: 'var(--mantine-color-dark-6)' }
+                }}
               />
               <NumberInput
                 label="Estimated Days"
@@ -374,73 +404,101 @@ export function TaskDrawer({ taskId, opened, onClose, onTaskUpdate }: TaskDrawer
                 decimalScale={1}
                 size="md"
                 leftSection={<IconClock size={18} />}
+                styles={{
+                  input: { borderRadius: '12px', border: '1px solid var(--mantine-color-gray-2)' },
+                  label: { fontWeight: 600, color: 'var(--mantine-color-dark-6)' }
+                }}
               />
             </Stack>
           ) : (
             <>
-              <Group gap="sm" mb="lg">
-                <IconTarget size={20} color="var(--mantine-color-blue-6)" />
-                <Text fw={700} size="xl">{task.task_name}</Text>
-              </Group>
-              
-              <Group gap="sm" mb="lg">
-                <Badge 
-                  color={getStatusColor(task.task_status)} 
-                  variant="light" 
-                  size="lg"
-                  leftSection={<IconFlag size={14} />}
-                >
-                  {task.task_status.toUpperCase()}
-                </Badge>
-                {task.is_custom && (
-                  <Badge variant="outline" color="blue" size="md">
-                    Custom Task
-                  </Badge>
-                )}
-                {task.category && (
-                  <Badge variant="outline" size="md">
-                    {task.category}
-                  </Badge>
-                )}
-                {task.is_manually_escalated && (
-                  <Badge color="red" variant="light" size="md" leftSection={<IconAlertTriangle size={14} />}>
-                    Escalated
-                  </Badge>
-                )}
+              <Group gap="md" mb="xl">
+                <div style={{ 
+                  padding: '12px', 
+                  borderRadius: '12px', 
+                  background: 'var(--mantine-color-primary-1)' 
+                }}>
+                  <IconTarget size={24} color="var(--mantine-color-primary-6)" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <Text fw={700} size="xl" c="dark.8" mb="xs">{task.task_name}</Text>
+                  <Group gap="sm">
+                    <Badge 
+                      color={getStatusColor(task.task_status)} 
+                      variant="light" 
+                      size="md"
+                      style={{ 
+                        borderRadius: '8px',
+                        fontWeight: 600,
+                        textTransform: 'capitalize'
+                      }}
+                    >
+                      {task.task_status}
+                    </Badge>
+                    {task.is_custom && (
+                      <Badge variant="outline" color="primary" size="md" style={{ borderRadius: '8px' }}>
+                        Custom Task
+                      </Badge>
+                    )}
+                    {task.category && (
+                      <Badge variant="outline" size="md" style={{ borderRadius: '8px' }}>
+                        {task.category}
+                      </Badge>
+                    )}
+                    {task.is_manually_escalated && (
+                      <Badge color="red" variant="light" size="md" style={{ borderRadius: '8px' }}>
+                        <Group gap={4}>
+                          <IconAlertTriangle size={12} />
+                          <span>Escalated</span>
+                        </Group>
+                      </Badge>
+                    )}
+                  </Group>
+                </div>
               </Group>
 
               {task.task_description && (
-                <Group gap="sm" align="flex-start" mb="lg">
-                  <IconMessage size={18} color="var(--mantine-color-dimmed)" style={{ marginTop: 2 }} />
-                  <Text size="md" c="dimmed" style={{ flex: 1 }}>
-                    {task.task_description}
-                  </Text>
-                </Group>
+                <div style={{ 
+                  padding: '16px', 
+                  borderRadius: '12px', 
+                  background: 'var(--mantine-color-gray-0)',
+                  border: '1px solid var(--mantine-color-gray-1)'
+                }}>
+                  <Group gap="sm" align="flex-start">
+                    <IconMessage size={16} color="var(--mantine-color-primary-6)" style={{ marginTop: 2 }} />
+                    <Text size="md" c="dark.7" style={{ flex: 1, lineHeight: 1.6 }}>
+                      {task.task_description}
+                    </Text>
+                  </Group>
+                </div>
               )}
             </>
           )}
 
           {/* Status Change Buttons - only show when not in edit mode */}
           {!editMode && (
-            <Group gap="xs" mt="md">
+            <Group gap="sm" mt="xl">
               {task.task_status === 'pending' && (
                 <>
                   <Button
-                    size="xs"
+                    size="sm"
                     variant="light"
-                    leftSection={<IconPlayerPlay size={14} />}
+                    color="primary"
+                    leftSection={<IconPlayerPlay size={16} />}
                     onClick={() => handleStatusChange('ongoing')}
                     disabled={updating}
+                    style={{ borderRadius: '10px', fontWeight: 500 }}
                   >
-                    Start
+                    Start Task
                   </Button>
                   <Button
-                    size="xs"
+                    size="sm"
                     variant="light"
                     color="red"
-                    leftSection={<IconAlertTriangle size={14} />}
+                    leftSection={<IconAlertTriangle size={16} />}
                     onClick={() => handleStatusChange('escalated')}
                     disabled={updating}
+                    style={{ borderRadius: '10px', fontWeight: 500 }}
                   >
                     Escalate
                   </Button>
@@ -449,22 +507,24 @@ export function TaskDrawer({ taskId, opened, onClose, onTaskUpdate }: TaskDrawer
               {task.task_status === 'ongoing' && (
                 <>
                   <Button
-                    size="xs"
+                    size="sm"
                     variant="light"
                     color="green"
-                    leftSection={<IconCheck size={14} />}
+                    leftSection={<IconCheck size={16} />}
                     onClick={() => handleStatusChange('completed')}
                     disabled={updating}
+                    style={{ borderRadius: '10px', fontWeight: 500 }}
                   >
-                    Complete
+                    Mark Complete
                   </Button>
                   <Button
-                    size="xs"
+                    size="sm"
                     variant="light"
                     color="red"
-                    leftSection={<IconAlertTriangle size={14} />}
+                    leftSection={<IconAlertTriangle size={16} />}
                     onClick={() => handleStatusChange('escalated')}
                     disabled={updating}
+                    style={{ borderRadius: '10px', fontWeight: 500 }}
                   >
                     Escalate
                   </Button>
@@ -473,35 +533,40 @@ export function TaskDrawer({ taskId, opened, onClose, onTaskUpdate }: TaskDrawer
               {task.task_status === 'escalated' && (
                 <>
                   <Button
-                    size="xs"
+                    size="sm"
                     variant="light"
-                    leftSection={<IconPlayerPlay size={14} />}
+                    color="primary"
+                    leftSection={<IconPlayerPlay size={16} />}
                     onClick={() => handleStatusChange('ongoing')}
                     disabled={updating}
+                    style={{ borderRadius: '10px', fontWeight: 500 }}
                   >
                     Resume
                   </Button>
                   <Button
-                    size="xs"
+                    size="sm"
                     variant="light"
                     color="green"
-                    leftSection={<IconCheck size={14} />}
+                    leftSection={<IconCheck size={16} />}
                     onClick={() => handleStatusChange('completed')}
                     disabled={updating}
+                    style={{ borderRadius: '10px', fontWeight: 500 }}
                   >
-                    Complete
+                    Mark Complete
                   </Button>
                 </>
               )}
               {task.task_status === 'completed' && (
                 <Button
-                  size="xs"
+                  size="sm"
                   variant="light"
-                  leftSection={<IconRestore size={14} />}
+                  color="blue"
+                  leftSection={<IconRestore size={16} />}
                   onClick={() => handleStatusChange('ongoing')}
                   disabled={updating}
+                  style={{ borderRadius: '10px', fontWeight: 500 }}
                 >
-                  Reopen
+                  Reopen Task
                 </Button>
               )}
             </Group>
@@ -509,119 +574,236 @@ export function TaskDrawer({ taskId, opened, onClose, onTaskUpdate }: TaskDrawer
         </Card>
 
         {/* Task Details */}
-        <Card withBorder p="xl" radius="md">
-          <Group gap="sm" mb="lg">
-            <IconInfoCircle size={20} color="var(--mantine-color-blue-6)" />
-            <Text fw={600} size="lg">Task Information</Text>
+        <Card 
+          withBorder={false} 
+          p="xl" 
+          radius="lg"
+          style={{ 
+            background: 'white',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+            border: '1px solid var(--mantine-color-gray-1)'
+          }}
+        >
+          <Group gap="md" mb="xl">
+            <div style={{ 
+              padding: '10px', 
+              borderRadius: '12px', 
+              background: 'var(--mantine-color-blue-1)' 
+            }}>
+              <IconInfoCircle size={20} color="var(--mantine-color-blue-6)" />
+            </div>
+            <Text fw={600} size="lg" c="dark.8">Task Information</Text>
           </Group>
           <Stack gap="lg">
-            <Group justify="space-between" align="center">
-              <Group gap="sm">
-                <IconHash size={18} color="var(--mantine-color-violet-6)" />
-                <Text size="md" c="dimmed">Phase</Text>
+            <div style={{ 
+              padding: '16px', 
+              borderRadius: '12px', 
+              background: 'var(--mantine-color-violet-0)',
+              border: '1px solid var(--mantine-color-violet-1)'
+            }}>
+              <Group justify="space-between" align="center">
+                <Group gap="sm">
+                  <IconHash size={18} color="var(--mantine-color-violet-6)" />
+                  <Text size="md" fw={500} c="dark.7">Phase</Text>
+                </Group>
+                <Badge variant="light" color="violet" size="md" style={{ borderRadius: '8px', fontWeight: 600 }}>
+                  Phase {task.phase_order}: {task.phase_name}
+                </Badge>
               </Group>
-              <Badge variant="light" color="violet" size="lg">
-                Phase {task.phase_order}: {task.phase_name}
-              </Badge>
-            </Group>
-            <Group justify="space-between" align="center">
-              <Group gap="sm">
-                <IconStairs size={18} color="var(--mantine-color-indigo-6)" />
-                <Text size="md" c="dimmed">Step</Text>
+            </div>
+            
+            <div style={{ 
+              padding: '16px', 
+              borderRadius: '12px', 
+              background: 'var(--mantine-color-indigo-0)',
+              border: '1px solid var(--mantine-color-indigo-1)'
+            }}>
+              <Group justify="space-between" align="center">
+                <Group gap="sm">
+                  <IconStairs size={18} color="var(--mantine-color-indigo-6)" />
+                  <Text size="md" fw={500} c="dark.7">Step</Text>
+                </Group>
+                <Badge variant="light" color="indigo" size="md" style={{ borderRadius: '8px', fontWeight: 600 }}>
+                  Step {task.step_order}: {task.step_name}
+                </Badge>
               </Group>
-              <Badge variant="light" color="indigo" size="lg">
-                Step {task.step_order}: {task.step_name}
-              </Badge>
-            </Group>
+            </div>
+
             {task.estimated_days && (
+              <div style={{ 
+                padding: '16px', 
+                borderRadius: '12px', 
+                background: 'var(--mantine-color-orange-0)',
+                border: '1px solid var(--mantine-color-orange-1)'
+              }}>
+                <Group justify="space-between" align="center">
+                  <Group gap="sm">
+                    <IconClock size={18} color="var(--mantine-color-orange-6)" />
+                    <Text size="md" fw={500} c="dark.7">Estimated Days</Text>
+                  </Group>
+                  <Text size="md" fw={600} c="orange.7">{task.estimated_days}d</Text>
+                </Group>
+              </div>
+            )}
+
+            <div style={{ 
+              padding: '16px', 
+              borderRadius: '12px', 
+              background: 'var(--mantine-color-teal-0)',
+              border: '1px solid var(--mantine-color-teal-1)'
+            }}>
               <Group justify="space-between" align="center">
                 <Group gap="sm">
-                  <IconClock size={18} color="var(--mantine-color-orange-6)" />
-                  <Text size="md" c="dimmed">Estimated Days</Text>
+                  <IconHourglass size={18} color="var(--mantine-color-teal-6)" />
+                  <Text size="md" fw={500} c="dark.7">Actual Days</Text>
                 </Group>
-                <Text size="md" fw={500}>{task.estimated_days}d</Text>
+                <Text size="md" fw={600} c="teal.7">{task.actual_days}d</Text>
               </Group>
-            )}
-            <Group justify="space-between" align="center">
-              <Group gap="sm">
-                <IconHourglass size={18} color="var(--mantine-color-teal-6)" />
-                <Text size="md" c="dimmed">Actual Days</Text>
-              </Group>
-              <Text size="md" fw={500}>{task.actual_days}d</Text>
-            </Group>
+            </div>
+
             {task.deadline && (
-              <Group justify="space-between" align="center">
-                <Group gap="sm">
-                  <IconCalendar size={18} color="var(--mantine-color-red-6)" />
-                  <Text size="md" c="dimmed">Deadline</Text>
+              <div style={{ 
+                padding: '16px', 
+                borderRadius: '12px', 
+                background: 'var(--mantine-color-red-0)',
+                border: '1px solid var(--mantine-color-red-1)'
+              }}>
+                <Group justify="space-between" align="center">
+                  <Group gap="sm">
+                    <IconCalendar size={18} color="var(--mantine-color-red-6)" />
+                    <Text size="md" fw={500} c="dark.7">Deadline</Text>
+                  </Group>
+                  <Text size="md" fw={600} c="red.7">{new Date(task.deadline).toLocaleDateString()}</Text>
                 </Group>
-                <Text size="md" fw={500}>{new Date(task.deadline).toLocaleDateString()}</Text>
-              </Group>
+              </div>
             )}
+
             {task.started_at && (
-              <Group justify="space-between" align="center">
-                <Group gap="sm">
-                  <IconPlayerPlay size={18} color="var(--mantine-color-green-6)" />
-                  <Text size="md" c="dimmed">Started</Text>
+              <div style={{ 
+                padding: '16px', 
+                borderRadius: '12px', 
+                background: 'var(--mantine-color-green-0)',
+                border: '1px solid var(--mantine-color-green-1)'
+              }}>
+                <Group justify="space-between" align="center">
+                  <Group gap="sm">
+                    <IconPlayerPlay size={18} color="var(--mantine-color-green-6)" />
+                    <Text size="md" fw={500} c="dark.7">Started</Text>
+                  </Group>
+                  <Text size="md" fw={600} c="green.7">{new Date(task.started_at).toLocaleDateString()}</Text>
                 </Group>
-                <Text size="md" fw={500}>{new Date(task.started_at).toLocaleDateString()}</Text>
-              </Group>
+              </div>
             )}
+
             {task.completed_at && (
-              <Group justify="space-between" align="center">
-                <Group gap="sm">
-                  <IconCheck size={18} color="var(--mantine-color-green-6)" />
-                  <Text size="md" c="dimmed">Completed</Text>
+              <div style={{ 
+                padding: '16px', 
+                borderRadius: '12px', 
+                background: 'var(--mantine-color-green-0)',
+                border: '1px solid var(--mantine-color-green-1)'
+              }}>
+                <Group justify="space-between" align="center">
+                  <Group gap="sm">
+                    <IconCheck size={18} color="var(--mantine-color-green-6)" />
+                    <Text size="md" fw={500} c="dark.7">Completed</Text>
+                  </Group>
+                  <Text size="md" fw={600} c="green.7">{new Date(task.completed_at).toLocaleDateString()}</Text>
                 </Group>
-                <Text size="md" fw={500}>{new Date(task.completed_at).toLocaleDateString()}</Text>
-              </Group>
+              </div>
             )}
           </Stack>
         </Card>
 
         {/* Checklist */}
         {task.checklist_items && task.checklist_items.length > 0 && (
-          <Card withBorder p="xl" radius="md">
-            <Group justify="space-between" mb="lg">
-              <Group gap="sm">
-                <IconListCheck size={20} color="var(--mantine-color-green-6)" />
-                <Text fw={600} size="lg">Checklist</Text>
+          <Card 
+            withBorder={false} 
+            p="xl" 
+            radius="lg"
+            style={{ 
+              background: 'white',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+              border: '1px solid var(--mantine-color-gray-1)'
+            }}
+          >
+            <Group justify="space-between" mb="xl">
+              <Group gap="md">
+                <div style={{ 
+                  padding: '10px', 
+                  borderRadius: '12px', 
+                  background: 'var(--mantine-color-green-1)' 
+                }}>
+                  <IconListCheck size={20} color="var(--mantine-color-green-6)" />
+                </div>
+                <Text fw={600} size="lg" c="dark.8">Checklist</Text>
               </Group>
-              <Badge variant="light" color="green" size="lg">
+              <Badge variant="light" color="green" size="md" style={{ borderRadius: '8px', fontWeight: 600 }}>
                 {completedChecklistItems}/{totalChecklistItems} completed
               </Badge>
             </Group>
             
-            <Progress value={checklistProgress} mb="lg" size="md" color="green" />
+            <Progress 
+              value={checklistProgress} 
+              mb="xl" 
+              size="lg" 
+              color="green" 
+              style={{ borderRadius: '8px' }}
+            />
             
             <Stack gap="md">
               {task.checklist_items
                 .sort((a, b) => a.order - b.order)
                 .map((item) => (
-                  <Checkbox
-                    key={item.id}
-                    label={item.text}
-                    checked={item.completed || false}
-                    onChange={(event) => handleChecklistToggle(item.id, event.currentTarget.checked)}
-                    size="md"
-                  />
+                  <div key={item.id} style={{ 
+                    padding: '12px 16px', 
+                    borderRadius: '12px', 
+                    background: item.completed ? 'var(--mantine-color-green-0)' : 'var(--mantine-color-gray-0)',
+                    border: `1px solid ${item.completed ? 'var(--mantine-color-green-2)' : 'var(--mantine-color-gray-2)'}`
+                  }}>
+                    <Checkbox
+                      label={item.text}
+                      checked={item.completed || false}
+                      onChange={(event) => handleChecklistToggle(item.id, event.currentTarget.checked)}
+                      size="md"
+                      styles={{
+                        label: { fontWeight: 500, color: 'var(--mantine-color-dark-7)' }
+                      }}
+                    />
+                  </div>
                 ))}
             </Stack>
           </Card>
         )}
 
         {/* Assigned Crew */}
-        <Card withBorder p="xl" radius="md">
-          <Group justify="space-between" mb="lg">
-            <Group gap="sm">
-              <IconUsers size={20} color="var(--mantine-color-blue-6)" />
-              <Text fw={600} size="lg">Assigned People</Text>
+        <Card 
+          withBorder={false} 
+          p="xl" 
+          radius="lg"
+          style={{ 
+            background: 'white',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+            border: '1px solid var(--mantine-color-gray-1)'
+          }}
+        >
+          <Group justify="space-between" mb="xl">
+            <Group gap="md">
+              <div style={{ 
+                padding: '10px', 
+                borderRadius: '12px', 
+                background: 'var(--mantine-color-blue-1)' 
+              }}>
+                <IconUsers size={20} color="var(--mantine-color-blue-6)" />
+              </div>
+              <Text fw={600} size="lg" c="dark.8">Assigned People</Text>
             </Group>
             <Button
               size="sm"
               variant="light"
+              color="primary"
               leftSection={<IconPlus size={16} />}
               onClick={() => setAssignCrewModalOpened(true)}
+              style={{ borderRadius: '10px', fontWeight: 500 }}
             >
               Assign
             </Button>
@@ -629,50 +811,87 @@ export function TaskDrawer({ taskId, opened, onClose, onTaskUpdate }: TaskDrawer
           
           {task?.assigned_crew && task.assigned_crew.length > 0 ? (
             <Stack gap="md">
-                  {task.assigned_crew.map((crew) => (
-                <Group key={crew.crew_id} justify="space-between" p="md" bg="gray.0" style={{ borderRadius: 8 }}>
-                  <Group gap="md">
-                    <Avatar size="md" radius="xl">
-                      <IconUser size={20} />
-                    </Avatar>
-                    <div>
-                      <Text size="md" fw={500}>{crew.crew_name}</Text>
-                      <Text size="sm" c="dimmed">{crew.crew_email}</Text>
-                      <Badge size="sm" variant="outline" mt="xs">
-                        {crew.role_name} - {crew.department_name}
-                      </Badge>
-                    </div>
+              {task.assigned_crew.map((crew) => (
+                <div key={crew.crew_id} style={{ 
+                  padding: '16px', 
+                  borderRadius: '12px', 
+                  background: 'var(--mantine-color-gray-0)',
+                  border: '1px solid var(--mantine-color-gray-2)'
+                }}>
+                  <Group justify="space-between">
+                    <Group gap="md">
+                      <Avatar size="lg" radius="xl" color="primary" gradient={{ from: 'primary.4', to: 'primary.6' }}>
+                        <IconUser size={24} />
+                      </Avatar>
+                      <div>
+                        <Text size="md" fw={600} c="dark.8">{crew.crew_name}</Text>
+                        <Text size="sm" c="dimmed" mb="xs">{crew.crew_email}</Text>
+                        <Badge 
+                          size="sm" 
+                          variant="light" 
+                          color="primary"
+                          style={{ borderRadius: '6px', fontWeight: 500 }}
+                        >
+                          {crew.role_name} - {crew.department_name}
+                        </Badge>
+                      </div>
+                    </Group>
+                    <ActionIcon
+                      size="lg"
+                      variant="light"
+                      color="red"
+                      onClick={() => handleRemoveCrew(crew.crew_id)}
+                      loading={removingCrew}
+                      disabled={task?.assigned_crew.length === 1}
+                      title={task?.assigned_crew.length === 1 ? "Cannot remove the last assigned person" : "Remove from task"}
+                      style={{ borderRadius: '10px' }}
+                    >
+                      <IconTrash size={18} />
+                    </ActionIcon>
                   </Group>
-                  <ActionIcon
-                    size="md"
-                    variant="subtle"
-                    color="red"
-                    onClick={() => handleRemoveCrew(crew.crew_id)}
-                    loading={removingCrew}
-                    disabled={task?.assigned_crew.length === 1}
-                    title={task?.assigned_crew.length === 1 ? "Cannot remove the last assigned person" : "Remove from task"}
-                  >
-                    <IconTrash size={16} />
-                  </ActionIcon>
-                </Group>
+                </div>
               ))}
             </Stack>
           ) : (
-            <Text size="md" c="dimmed" ta="center" py="xl">
-              No one assigned to this task
-            </Text>
+            <div style={{ 
+              padding: '32px', 
+              textAlign: 'center',
+              borderRadius: '12px',
+              background: 'var(--mantine-color-gray-0)',
+              border: '1px solid var(--mantine-color-gray-2)'
+            }}>
+              <IconUsers size={32} color="var(--mantine-color-gray-5)" style={{ marginBottom: '12px' }} />
+              <Text size="md" c="dimmed" fw={500}>
+                No one assigned to this task
+              </Text>
+            </div>
           )}
         </Card>
 
         {/* File Attachments */}
-        <Card withBorder p="xl" radius="md">
-          <Group gap="sm" mb="lg">
-            <IconPaperclip size={20} color="var(--mantine-color-orange-6)" />
-            <Text fw={600} size="lg">File Attachments</Text>
+        <Card 
+          withBorder={false} 
+          p="xl" 
+          radius="lg"
+          style={{ 
+            background: 'white',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+            border: '1px solid var(--mantine-color-gray-1)'
+          }}
+        >
+          <Group gap="md" mb="xl">
+            <div style={{ 
+              padding: '10px', 
+              borderRadius: '12px', 
+              background: 'var(--mantine-color-orange-1)' 
+            }}>
+              <IconPaperclip size={20} color="var(--mantine-color-orange-6)" />
+            </div>
+            <Text fw={600} size="lg" c="dark.8">File Attachments</Text>
           </Group>
           
           {/* Upload Section */}
-          <Stack gap="md" mb="lg">
+          <Stack gap="md" mb="xl">
             <FileInput
               placeholder="Select files to upload"
               multiple
@@ -680,13 +899,18 @@ export function TaskDrawer({ taskId, opened, onClose, onTaskUpdate }: TaskDrawer
               onChange={setFiles}
               leftSection={<IconFileUpload size={18} />}
               size="md"
+              styles={{
+                input: { borderRadius: '12px', border: '1px solid var(--mantine-color-gray-2)' }
+              }}
             />
             {files.length > 0 && (
               <Button
                 size="md"
+                color="primary"
                 onClick={handleFileUpload}
                 loading={uploadingFiles}
                 leftSection={<IconFileUpload size={18} />}
+                style={{ borderRadius: '10px', fontWeight: 500 }}
               >
                 Upload {files.length} file{files.length > 1 ? 's' : ''}
               </Button>
@@ -697,62 +921,101 @@ export function TaskDrawer({ taskId, opened, onClose, onTaskUpdate }: TaskDrawer
           {task.file_attachments && task.file_attachments.length > 0 ? (
             <Stack gap="md">
               {task.file_attachments.map((file) => (
-                <Group key={file.id} justify="space-between" p="md" bg="gray.0" style={{ borderRadius: 8 }}>
-                  <Group gap="md">
-                    <IconFile size={20} color="var(--mantine-color-blue-6)" />
-                    <div>
-                      <Text size="md" fw={500}>{file.file_name}</Text>
-                      <Text size="sm" c="dimmed">
-                        {(file.file_size / 1024 / 1024).toFixed(2)} MB • {file.file_type?.toUpperCase()}
-                      </Text>
-                      <Text size="xs" c="dimmed">
-                        {new Date(file.uploaded_at).toLocaleString()}
-                      </Text>
-                    </div>
+                <div key={file.id} style={{ 
+                  padding: '16px', 
+                  borderRadius: '12px', 
+                  background: 'var(--mantine-color-gray-0)',
+                  border: '1px solid var(--mantine-color-gray-2)'
+                }}>
+                  <Group justify="space-between">
+                    <Group gap="md">
+                      <div style={{ 
+                        padding: '10px', 
+                        borderRadius: '10px', 
+                        background: 'var(--mantine-color-blue-1)' 
+                      }}>
+                        <IconFile size={20} color="var(--mantine-color-blue-6)" />
+                      </div>
+                      <div>
+                        <Text size="md" fw={600} c="dark.8">{file.file_name}</Text>
+                        <Text size="sm" c="dimmed" mb="xs">
+                          {(file.file_size / 1024 / 1024).toFixed(2)} MB • {file.file_type?.toUpperCase()}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          {new Date(file.uploaded_at).toLocaleString()}
+                        </Text>
+                      </div>
+                    </Group>
+                    <Group gap="sm">
+                      <ActionIcon 
+                        size="lg" 
+                        variant="light" 
+                        color="blue"
+                        onClick={() => handleDownloadFile(file.file_url, file.file_name)}
+                        title="Download file"
+                        style={{ borderRadius: '10px' }}
+                      >
+                        <IconDownload size={18} />
+                      </ActionIcon>
+                      <ActionIcon 
+                        size="lg" 
+                        variant="light" 
+                        color="red"
+                        onClick={() => {
+                          setFileToDelete({ id: file.id, file_url: file.file_url, file_name: file.file_name });
+                          setDeleteConfirmOpened(true);
+                        }}
+                        loading={deletingFile}
+                        title="Delete file"
+                        style={{ borderRadius: '10px' }}
+                      >
+                        <IconTrash size={18} />
+                      </ActionIcon>
+                    </Group>
                   </Group>
-                  <Group gap="sm">
-                    <ActionIcon 
-                      size="md" 
-                      variant="subtle" 
-                      color="blue"
-                      onClick={() => handleDownloadFile(file.file_url, file.file_name)}
-                      title="Download file"
-                    >
-                      <IconDownload size={16} />
-                    </ActionIcon>
-                    <ActionIcon 
-                      size="md" 
-                      variant="subtle" 
-                      color="red"
-                      onClick={() => {
-                        setFileToDelete({ id: file.id, file_url: file.file_url, file_name: file.file_name });
-                        setDeleteConfirmOpened(true);
-                      }}
-                      loading={deletingFile}
-                      title="Delete file"
-                    >
-                      <IconTrash size={16} />
-                    </ActionIcon>
-                  </Group>
-                </Group>
+                </div>
               ))}
             </Stack>
           ) : (
-            <Text size="md" c="dimmed" ta="center" py="xl">
-              No files attached
-            </Text>
+            <div style={{ 
+              padding: '32px', 
+              textAlign: 'center',
+              borderRadius: '12px',
+              background: 'var(--mantine-color-gray-0)',
+              border: '1px solid var(--mantine-color-gray-2)'
+            }}>
+              <IconPaperclip size={32} color="var(--mantine-color-gray-5)" style={{ marginBottom: '12px' }} />
+              <Text size="md" c="dimmed" fw={500}>
+                No files attached
+              </Text>
+            </div>
           )}
         </Card>
 
         {/* Comments */}
-        <Card withBorder p="xl" radius="md">
-          <Group gap="sm" mb="lg">
-            <IconMessage size={20} color="var(--mantine-color-grape-6)" />
-            <Text fw={600} size="lg">Comments</Text>
+        <Card 
+          withBorder={false} 
+          p="xl" 
+          radius="lg"
+          style={{ 
+            background: 'white',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+            border: '1px solid var(--mantine-color-gray-1)'
+          }}
+        >
+          <Group gap="md" mb="xl">
+            <div style={{ 
+              padding: '10px', 
+              borderRadius: '12px', 
+              background: 'var(--mantine-color-grape-1)' 
+            }}>
+              <IconMessage size={20} color="var(--mantine-color-grape-6)" />
+            </div>
+            <Text fw={600} size="lg" c="dark.8">Comments</Text>
           </Group>
           
           {/* Add Comment */}
-          <Stack gap="md" mb="lg">
+          <Stack gap="md" mb="xl">
             <Textarea
               placeholder="Add a comment..."
               value={comment}
@@ -760,13 +1023,18 @@ export function TaskDrawer({ taskId, opened, onClose, onTaskUpdate }: TaskDrawer
               minRows={3}
               size="md"
               leftSection={<IconMessage size={18} />}
+              styles={{
+                input: { borderRadius: '12px', border: '1px solid var(--mantine-color-gray-2)' }
+              }}
             />
             <Button
               size="md"
+              color="primary"
               onClick={handleAddComment}
               loading={submittingComment}
               disabled={!comment.trim()}
               leftSection={<IconSend size={18} />}
+              style={{ borderRadius: '10px', fontWeight: 500 }}
             >
               Add Comment
             </Button>
@@ -774,38 +1042,79 @@ export function TaskDrawer({ taskId, opened, onClose, onTaskUpdate }: TaskDrawer
 
           {/* Comments Timeline */}
           {task.comments && task.comments.length > 0 ? (
-            <Timeline active={task.comments.length - 1} bulletSize={24} lineWidth={2}>
+            <Timeline 
+              active={task.comments.length - 1} 
+              bulletSize={32} 
+              lineWidth={2}
+              color="primary"
+            >
               {task.comments.map((comment) => (
                 <Timeline.Item
                   key={comment.id}
-                  bullet={<IconUser size={16} />}
+                  bullet={
+                    <div style={{ 
+                      padding: '6px', 
+                      borderRadius: '50%', 
+                      background: 'var(--mantine-color-primary-1)' 
+                    }}>
+                      <IconUser size={16} color="var(--mantine-color-primary-6)" />
+                    </div>
+                  }
                   title={
-                    <Text fw={500} size="md">{comment.author}</Text>
+                    <Text fw={600} size="md" c="dark.8">{comment.author}</Text>
                   }
                 >
-                  <Text size="md" mb="sm">
-                    {comment.text}
-                  </Text>
-                  <Text size="sm" c="dimmed">
-                    {new Date(comment.created_at).toLocaleString()}
-                  </Text>
+                  <div style={{ 
+                    padding: '12px 16px', 
+                    borderRadius: '12px', 
+                    background: 'var(--mantine-color-gray-0)',
+                    border: '1px solid var(--mantine-color-gray-1)',
+                    marginTop: '8px'
+                  }}>
+                    <Text size="md" mb="sm" c="dark.7" style={{ lineHeight: 1.6 }}>
+                      {comment.text}
+                    </Text>
+                    <Text size="sm" c="dimmed">
+                      {new Date(comment.created_at).toLocaleString()}
+                    </Text>
+                  </div>
                 </Timeline.Item>
               ))}
             </Timeline>
           ) : (
-            <Text size="md" c="dimmed" ta="center" py="xl">
-              No comments yet
-            </Text>
+            <div style={{ 
+              padding: '32px', 
+              textAlign: 'center',
+              borderRadius: '12px',
+              background: 'var(--mantine-color-gray-0)',
+              border: '1px solid var(--mantine-color-gray-2)'
+            }}>
+              <IconMessage size={32} color="var(--mantine-color-gray-5)" style={{ marginBottom: '12px' }} />
+              <Text size="md" c="dimmed" fw={500}>
+                No comments yet
+              </Text>
+            </div>
           )}
         </Card>
 
         {/* Escalation Info */}
         {task.escalation_reason && (
-          <Alert color="red" icon={<IconAlertTriangle size={20} />} p="xl" radius="md">
-            <Text fw={600} mb="md" size="lg">Escalation Reason</Text>
-            <Text size="md" mb="md">{task.escalation_reason}</Text>
+          <Alert 
+            color="red" 
+            icon={<IconAlertTriangle size={20} />} 
+            p="xl" 
+            radius="lg"
+            style={{
+              border: '1px solid var(--mantine-color-red-2)',
+              background: 'var(--mantine-color-red-0)'
+            }}
+          >
+            <Text fw={700} mb="md" size="lg" c="red.8">Escalation Reason</Text>
+            <Text size="md" mb="md" c="dark.7" style={{ lineHeight: 1.6 }}>
+              {task.escalation_reason}
+            </Text>
             {task.escalated_at && (
-              <Text size="sm" c="dimmed">
+              <Text size="sm" c="red.6" fw={500}>
                 Escalated on {new Date(task.escalated_at).toLocaleString()}
               </Text>
             )}
@@ -821,60 +1130,99 @@ export function TaskDrawer({ taskId, opened, onClose, onTaskUpdate }: TaskDrawer
           setCrewSearchTerm('');
           setSelectedCrewId('');
         }}
-        title="Assign Crew to Task"
+        title={
+          <Group gap="md">
+            <div style={{ 
+              padding: '8px', 
+              borderRadius: '10px', 
+              background: 'var(--mantine-color-blue-1)' 
+            }}>
+              <IconUsers size={20} color="var(--mantine-color-blue-6)" />
+            </div>
+            <Text fw={600} size="lg" c="dark.8">Assign Crew to Task</Text>
+          </Group>
+        }
         size="lg"
+        radius="lg"
+        styles={{
+          content: { borderRadius: '16px' },
+          header: { borderBottom: '1px solid var(--mantine-color-gray-2)', paddingBottom: '16px' },
+          body: { padding: '24px' }
+        }}
       >
-        <Stack gap="md">
+        <Stack gap="lg">
           <TextInput
             placeholder="Search crew members..."
             value={crewSearchTerm}
             onChange={(e) => setCrewSearchTerm(e.target.value)}
             leftSection={<IconSearch size={16} />}
+            size="md"
+            styles={{
+              input: { borderRadius: '12px', border: '1px solid var(--mantine-color-gray-2)' }
+            }}
           />
           
           {crewLoading ? (
             <Center h={200}>
-              <Loader size="sm" />
+              <Loader size="lg" color="primary" />
             </Center>
           ) : unassignedCrew.length === 0 ? (
-            <Text c="dimmed" ta="center" py="xl">
-              {crewSearchTerm ? 'No crew members found matching your search' : 'All available crew members are already assigned'}
-            </Text>
+            <div style={{ 
+              padding: '32px', 
+              textAlign: 'center',
+              borderRadius: '12px',
+              background: 'var(--mantine-color-gray-0)',
+              border: '1px solid var(--mantine-color-gray-2)'
+            }}>
+              <IconUsers size={32} color="var(--mantine-color-gray-5)" style={{ marginBottom: '12px' }} />
+              <Text c="dimmed" fw={500}>
+                {crewSearchTerm ? 'No crew members found matching your search' : 'All available crew members are already assigned'}
+              </Text>
+            </div>
           ) : (
-            <SimpleGrid cols={1} spacing="xs" mah={400} style={{ overflowY: 'auto' }}>
+            <SimpleGrid cols={1} spacing="md" mah={400} style={{ overflowY: 'auto' }}>
               {unassignedCrew.map((crew) => (
-                <Card
+                <div
                   key={crew.id}
-                  withBorder
-                  p="sm"
                   style={{
+                    padding: '16px',
+                    borderRadius: '12px',
+                    border: `2px solid ${selectedCrewId === crew.id ? 'var(--mantine-color-primary-4)' : 'var(--mantine-color-gray-2)'}`,
+                    background: selectedCrewId === crew.id ? 'var(--mantine-color-primary-0)' : 'white',
                     cursor: 'pointer',
-                    backgroundColor: selectedCrewId === crew.id ? 'var(--mantine-color-blue-0)' : undefined,
+                    transition: 'all 0.2s ease'
                   }}
                   onClick={() => setSelectedCrewId(crew.id)}
                 >
-                  <Group gap="sm">
+                  <Group gap="md">
                     <Avatar
                       src={crew.photo_url}
-                      size="sm"
+                      size="md"
                       radius="xl"
+                      color="primary"
                     >
-                      <IconUser size={16} />
+                      <IconUser size={20} />
                     </Avatar>
                     <div style={{ flex: 1 }}>
-                      <Text size="sm" fw={500}>{crew.name}</Text>
-                      <Text size="xs" c="dimmed">{crew.email}</Text>
+                      <Text size="md" fw={600} c="dark.8">{crew.name}</Text>
+                      <Text size="sm" c="dimmed">{crew.email}</Text>
                     </div>
                     {selectedCrewId === crew.id && (
-                      <IconCheck size={16} color="var(--mantine-color-blue-6)" />
+                      <div style={{ 
+                        padding: '6px', 
+                        borderRadius: '50%', 
+                        background: 'var(--mantine-color-primary-6)' 
+                      }}>
+                        <IconCheck size={16} color="white" />
+                      </div>
                     )}
                   </Group>
-                </Card>
+                </div>
               ))}
             </SimpleGrid>
           )}
           
-          <Group justify="flex-end" mt="md">
+          <Group justify="flex-end" mt="lg">
             <Button
               variant="subtle"
               onClick={() => {
@@ -882,13 +1230,16 @@ export function TaskDrawer({ taskId, opened, onClose, onTaskUpdate }: TaskDrawer
                 setCrewSearchTerm('');
                 setSelectedCrewId('');
               }}
+              style={{ borderRadius: '10px' }}
             >
               Cancel
             </Button>
             <Button
+              color="primary"
               onClick={handleAssignCrew}
               disabled={!selectedCrewId}
               loading={assigningCrew}
+              style={{ borderRadius: '10px', fontWeight: 500 }}
             >
               Assign
             </Button>
@@ -903,21 +1254,47 @@ export function TaskDrawer({ taskId, opened, onClose, onTaskUpdate }: TaskDrawer
           setDeleteConfirmOpened(false);
           setFileToDelete(null);
         }}
-        title="Delete File"
+        title={
+          <Group gap="md">
+            <div style={{ 
+              padding: '8px', 
+              borderRadius: '10px', 
+              background: 'var(--mantine-color-red-1)' 
+            }}>
+              <IconTrash size={20} color="var(--mantine-color-red-6)" />
+            </div>
+            <Text fw={600} size="lg" c="dark.8">Delete File</Text>
+          </Group>
+        }
         size="md"
+        radius="lg"
+        styles={{
+          content: { borderRadius: '16px' },
+          header: { borderBottom: '1px solid var(--mantine-color-gray-2)', paddingBottom: '16px' },
+          body: { padding: '24px' }
+        }}
       >
-        <Stack gap="md">
-          <Text>
-            Are you sure you want to delete "{fileToDelete?.file_name}"? This action cannot be undone.
-          </Text>
+        <Stack gap="lg">
+          <div style={{ 
+            padding: '16px', 
+            borderRadius: '12px', 
+            background: 'var(--mantine-color-red-0)',
+            border: '1px solid var(--mantine-color-red-2)'
+          }}>
+            <Text size="md" c="dark.7" style={{ lineHeight: 1.6 }}>
+              Are you sure you want to delete <Text component="span" fw={600} c="red.7">"{fileToDelete?.file_name}"</Text>? 
+              This action cannot be undone.
+            </Text>
+          </div>
           
-          <Group justify="flex-end" mt="md">
+          <Group justify="flex-end" mt="lg">
             <Button
               variant="subtle"
               onClick={() => {
                 setDeleteConfirmOpened(false);
                 setFileToDelete(null);
               }}
+              style={{ borderRadius: '10px' }}
             >
               Cancel
             </Button>
@@ -925,8 +1302,9 @@ export function TaskDrawer({ taskId, opened, onClose, onTaskUpdate }: TaskDrawer
               color="red"
               onClick={handleDeleteFile}
               loading={deletingFile}
+              style={{ borderRadius: '10px', fontWeight: 500 }}
             >
-              Delete
+              Delete File
             </Button>
           </Group>
         </Stack>
